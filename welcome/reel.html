@@ -1,0 +1,622 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Welcome Greetings</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #000; overflow: hidden; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="out" width="1920" height="1080"></canvas>
+<script>
+// =====================================================================
+//  어서와 — world greetings typography, 30s @ 60fps, 1920x1080
+//  Pretendard (+ Noto fallbacks for Thai / Devanagari / Arabic / Chinese)
+//  Korean accents: 오방색 palette, 창살 (lattice) motif, 한지 light, 단청 band
+// =====================================================================
+const W = 1920, H = 1080, FPS = 60, DUR = 30;
+const SAMPLES = (new URLSearchParams(location.search)).get('samples') | 0 || 5;
+const SHUTTER = 0.5;
+
+const K = {
+  night: '#0F0B10', ink: '#141217', hanji: '#F3EBDD', paper: '#F7F1E6', warm: '#FFD08A', glow: '#FFE6BD',
+  wood: '#3A2216', red: '#D23B2A', blue: '#24489E', yellow: '#EFB22B', green: '#1D7A5C', white: '#F8F3EA',
+};
+const FAM = '"Pretendard", "Noto Sans SC", "Noto Sans Thai", "Noto Sans Devanagari", "Noto Sans Arabic", sans-serif';
+const F = (w, s) => `${w} ${s}px ${FAM}`;
+
+// ---------- math / easing ----------
+const TAU = Math.PI * 2;
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, t) => a + (b - a) * t;
+const prog = (t, a, b) => clamp((t - a) / (b - a));
+const E = {
+  lin: t => t, inQuad: t => t * t, outQuad: t => 1 - (1 - t) * (1 - t),
+  inCub: t => t * t * t, outCub: t => 1 - Math.pow(1 - t, 3),
+  ioCub: t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2,
+  outQuart: t => 1 - Math.pow(1 - t, 4),
+  outExpo: t => t >= 1 ? 1 : 1 - Math.pow(2, -10 * t),
+  inExpo: t => t <= 0 ? 0 : Math.pow(2, 10 * t - 10),
+  ioExpo: t => t <= 0 ? 0 : t >= 1 ? 1 : t < .5 ? Math.pow(2, 20 * t - 10) / 2 : (2 - Math.pow(2, -20 * t + 10)) / 2,
+  outBack: t => { const s = 1.70158; return 1 + (s + 1) * Math.pow(t - 1, 3) + s * Math.pow(t - 1, 2); },
+  inBack: t => { const s = 1.70158; return (s + 1) * t * t * t - s * t * t; },
+};
+const ev = (t, a, b, e = E.outExpo) => e(prog(t, a, b));
+function spring(t, f = 2.2, z = 0.38) {
+  if (t <= 0) return 0;
+  const w = TAU * f, wd = w * Math.sqrt(1 - z * z);
+  return 1 - Math.exp(-z * w * t) * (Math.cos(wd * t) + (z * w / wd) * Math.sin(wd * t));
+}
+function rng(seed) {
+  let a = seed >>> 0;
+  return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+const rgbCache = new Map();
+function RGB(h) { if (!rgbCache.has(h)) { const n = parseInt(h.slice(1), 16); rgbCache.set(h, [n >> 16 & 255, n >> 8 & 255, n & 255]); } return rgbCache.get(h); }
+function rgba(h, a) { const c = RGB(h); return `rgba(${c[0]},${c[1]},${c[2]},${a})`; }
+function mixc(a, b, t) { const A = RGB(a), B = RGB(b); return `rgb(${lerp(A[0], B[0], t) | 0},${lerp(A[1], B[1], t) | 0},${lerp(A[2], B[2], t) | 0})`; }
+
+// ---------- canvases ----------
+const out = document.getElementById('out');
+const octx = out.getContext('2d');
+const work = document.createElement('canvas'); work.width = W; work.height = H;
+const ctx = work.getContext('2d', { willReadFrequently: true });
+
+// ---------- type helpers (centred by real glyph bounds, any script) ----------
+const mCache = new Map();
+function metrics(str, font, ls = 0) {
+  const k = str + '|' + font + '|' + ls;
+  if (mCache.has(k)) return mCache.get(k);
+  ctx.save(); ctx.font = font; ctx.letterSpacing = '0px';
+  const m = ctx.measureText(str);
+  const chars = [...str].map((ch, i, arr) => {
+    const pre = arr.slice(0, i).join('');
+    return { ch, x: ctx.measureText(pre).width + i * ls, w: ctx.measureText(ch).width };
+  });
+  const r = { width: m.width + (chars.length - 1) * ls, asc: m.actualBoundingBoxAscent, desc: m.actualBoundingBoxDescent, chars };
+  ctx.restore(); mCache.set(k, r); return r;
+}
+// draw whole string centred at (cx, cy)
+function textC(c, str, font, cx, cy, fill, o = {}) {
+  const m = metrics(str, font, o.ls || 0);
+  c.save(); c.font = font; c.letterSpacing = (o.ls || 0) + 'px'; c.textBaseline = 'alphabetic';
+  c.textAlign = 'left';
+  const x = o.align === 'left' ? cx : cx - m.width / 2, base = cy + (m.asc - m.desc) / 2;
+  if (o.stroke) { c.lineWidth = o.lw || 3; c.strokeStyle = o.stroke; c.lineJoin = 'round'; c.strokeText(str, x, base); }
+  if (fill) { c.fillStyle = fill; c.fillText(str, x, base); }
+  c.restore();
+  return { x, base, m };
+}
+// per-character animation; fn(i, ch) -> {dx, dy, sx, sy, rot, a, col}
+function charsC(c, str, font, cx, cy, fill, fn, o = {}) {
+  const m = metrics(str, font, o.ls || 0);
+  const x0 = cx - m.width / 2, base = cy + (m.asc - m.desc) / 2;
+  c.save(); c.font = font; c.letterSpacing = '0px'; c.textBaseline = 'alphabetic';
+  if (o.clip) { const pad = (m.asc + m.desc) * 0.12; c.beginPath(); c.rect(-W, base - m.asc - pad, W * 3, m.asc + m.desc + pad * 2); c.clip(); }
+  m.chars.forEach((ch, i) => {
+    const s = fn(i, ch) || {};
+    if (s.a === 0) return;
+    c.save(); c.globalAlpha = s.a ?? 1;
+    const px = x0 + ch.x + ch.w / 2, py = base - (m.asc - m.desc) / 2;
+    c.translate(px + (s.dx || 0), py + (s.dy || 0)); c.rotate(s.rot || 0); c.scale(s.sx ?? 1, s.sy ?? 1);
+    c.fillStyle = s.col || fill; c.fillText(ch.ch, -ch.w / 2, (m.asc - m.desc) / 2);
+    c.restore();
+  });
+  c.restore();
+  return { x0, m };
+}
+function bg(c, col) { c.fillStyle = col; c.fillRect(-200, -200, W + 400, H + 400); }
+
+// ---------- 한지 texture ----------
+const hanjiTex = (() => {
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const g = cv.getContext('2d'), R = rng(88);
+  for (let i = 0; i < 2600; i++) {
+    const x = R() * W, y = R() * H, l = 10 + R() * 60, a = R() * TAU;
+    g.strokeStyle = R() < 0.5 ? 'rgba(120,90,50,0.06)' : 'rgba(255,255,255,0.10)';
+    g.lineWidth = 0.6 + R() * 1.2; g.beginPath(); g.moveTo(x, y);
+    g.quadraticCurveTo(x + Math.cos(a + 0.6) * l * 0.5, y + Math.sin(a + 0.6) * l * 0.5, x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke();
+  }
+  for (let i = 0; i < 160; i++) { g.fillStyle = 'rgba(140,100,60,0.05)'; g.beginPath(); g.arc(R() * W, R() * H, 1 + R() * 3, 0, TAU); g.fill(); }
+  return cv;
+})();
+function paperBg(c, col) { bg(c, col); c.drawImage(hanjiTex, 0, 0); }
+
+// ---------- 창살 (亞-lattice) motif ----------
+function aMotif(c, x, y, s) { // 亞 outline inside a cell, plus spokes to the cell edges
+  const m = s * 0.2, a = (s - 2 * m) * 0.3, L = x + m, T = y + m, R = x + s - m, B = y + s - m;
+  c.moveTo(L + a, T); c.lineTo(R - a, T); c.lineTo(R - a, T + a); c.lineTo(R, T + a); c.lineTo(R, B - a); c.lineTo(R - a, B - a);
+  c.lineTo(R - a, B); c.lineTo(L + a, B); c.lineTo(L + a, B - a); c.lineTo(L, B - a); c.lineTo(L, T + a); c.lineTo(L + a, T + a); c.closePath();
+  c.moveTo(x + s / 2, y); c.lineTo(x + s / 2, T); c.moveTo(x + s / 2, B); c.lineTo(x + s / 2, y + s);
+  c.moveTo(x, y + s / 2); c.lineTo(L, y + s / 2); c.moveTo(R, y + s / 2); c.lineTo(x + s, y + s / 2);
+}
+// draws a lattice over rect; p = draw-on progress (cells appear by diagonal order)
+function lattice(c, x, y, w, h, s, lw, col, p = 1) {
+  const cols = Math.ceil(w / s), rows = Math.ceil(h / s);
+  c.save(); c.beginPath(); c.rect(x, y, w, h); c.clip();
+  c.strokeStyle = col; c.lineWidth = lw; c.lineJoin = 'miter';
+  const per = s * 5.2;
+  for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
+    const q = clamp(p * (cols + rows) * 0.5 + 1 - (i + j) * 0.5);
+    if (q <= 0) continue;
+    c.setLineDash([per * q, per]); c.beginPath(); aMotif(c, x + i * s, y + j * s, s); c.stroke();
+  }
+  c.setLineDash([]);
+  c.beginPath(); for (let i = 0; i <= cols; i++) { c.moveTo(x + i * s, y); c.lineTo(x + i * s, y + h * clamp(p * 1.4)); }
+  for (let j = 0; j <= rows; j++) { c.moveTo(x, y + j * s); c.lineTo(x + w * clamp(p * 1.4), y + j * s); } c.stroke();
+  c.restore();
+}
+// 단청 band: nested stripes like painted eaves
+const DAN = [K.white, K.red, K.green, K.blue, K.white, K.yellow, K.red, K.green];
+function dancheongBand(c, x, y, w, h, p = 1) {
+  const n = DAN.length, sh = h / n;
+  for (let i = 0; i < n; i++) {
+    const q = ev(p, i * 0.04, 0.6 + i * 0.04, E.ioExpo);
+    c.fillStyle = DAN[i]; c.fillRect(x + w / 2 - w / 2 * q, y + i * sh, w * q, sh + 0.5);
+  }
+}
+
+// =====================================================================
+//  GREETINGS
+// =====================================================================
+const G = [
+  { t: 4.0, d: 1, w: 'Hola', lang: 'ESPAÑOL', bg: K.red, fg: K.white, fx: 'drop' },
+  { t: 5.0, d: 1, w: 'Bonjour', lang: 'FRANÇAIS', bg: K.hanji, fg: K.ink, fx: 'rise', ac: K.blue, paper: 1 },
+  { t: 6.0, d: 1, w: 'Ciao', lang: 'ITALIANO', bg: K.blue, fg: K.yellow, fx: 'stack' },
+  { t: 7.0, d: 1, w: 'こんにちは', lang: '日本語', bg: K.hanji, fg: K.ink, fx: 'vertical', ac: K.red, paper: 1 },
+  { t: 8.0, d: 1, w: 'Olá', lang: 'PORTUGUÊS', bg: K.green, fg: K.white, fx: 'zoom' },
+  { t: 9.0, d: 1, w: 'Привет', lang: 'РУССКИЙ', bg: K.ink, fg: K.white, fx: 'flip' },
+  { t: 10.0, d: 1, w: '你好', lang: '中文', bg: K.yellow, fg: K.ink, fx: 'circle' },
+  { t: 11.0, d: 1, w: 'Merhaba', lang: 'TÜRKÇE', bg: K.hanji, fg: K.ink, fx: 'type', ac: K.red, paper: 1 },
+  { t: 12.0, d: .5, w: 'Hallo', lang: 'DEUTSCH', bg: K.ink, fg: K.white, fx: 'slice' },
+  { t: 12.5, d: .5, w: 'Xin chào', lang: 'TIẾNG VIỆT', bg: K.red, fg: K.white, fx: 'track' },
+  { t: 13.0, d: .5, w: 'สวัสดี', lang: 'ภาษาไทย', bg: K.hanji, fg: K.green, fx: 'whole', paper: 1 },
+  { t: 13.5, d: .5, w: 'नमस्ते', lang: 'हिन्दी', bg: K.yellow, fg: K.ink, fx: 'matra' },
+  { t: 14.0, d: .5, w: 'مرحبا', lang: 'العربية', bg: K.green, fg: K.white, fx: 'rtl' },
+  { t: 14.5, d: .5, w: 'Γειά σου', lang: 'ΕΛΛΗΝΙΚΑ', bg: K.blue, fg: K.white, fx: 'rise' },
+  { t: 15.0, d: .5, w: 'Aloha', lang: 'HAWAIʻI', bg: K.hanji, fg: K.red, fx: 'wave', paper: 1 },
+  { t: 15.5, d: .5, w: 'Jambo', lang: 'KISWAHILI', bg: K.ink, fg: K.yellow, fx: 'drop', multi: 1 },
+  { t: 16.0, d: .5, w: 'Hej', lang: 'SVENSKA', bg: K.red, fg: K.white, fx: 'pop' },
+  { t: 16.5, d: .5, w: 'Kia ora', lang: 'TE REO MĀORI', bg: K.hanji, fg: K.blue, fx: 'split', paper: 1 },
+  { t: 17.0, d: .5, w: 'Sawubona', lang: 'ISIZULU', bg: K.green, fg: K.yellow, fx: 'track' },
+  { t: 17.5, d: .5, w: 'Halo', lang: 'BAHASA INDONESIA', bg: K.blue, fg: K.white, fx: 'zoom' },
+];
+const OBANG = [K.blue, K.red, K.yellow, K.white, K.green];
+
+function langLabel(c, g, lt, n) {
+  const a = ev(lt, 0.05, 0.25, E.lin);
+  c.save(); c.globalAlpha = a * 0.9;
+  const col = g.fg;
+  textC(c, String(n).padStart(2, '0'), F(700, 20), 960 - 170, 930, col, { ls: 3 });
+  c.fillStyle = col; c.fillRect(960 - 140, 929, 60 * ev(lt, 0.05, 0.35, E.ioExpo), 2);
+  textC(c, g.lang, F(600, 22), 960 - 66, 930, col, { ls: 7, align: 'left' });
+  // tiny 亞 mark (Korean accent)
+  c.strokeStyle = g.ac || col; c.lineWidth = 2; c.beginPath(); aMotif(c, 960 - 248, 912, 36); c.stroke();
+  c.restore();
+}
+
+function drawGreeting(c, g, lt, n) {
+  if (g.paper) paperBg(c, g.bg); else bg(c, g.bg);
+  const dur = g.d, cx = 960, cy = 500;
+  const big = g.d === 1 ? 330 : 300;
+  const font = F(900, big);
+  const punch = lerp(1.1, 1, E.outExpo(clamp(lt / 0.25)));
+  c.save(); c.translate(cx, cy); c.scale(punch, punch); c.translate(-cx, -cy);
+  switch (g.fx) {
+    case 'drop': {
+      const cols = g.multi ? [K.yellow, K.red, K.white, K.blue, K.green] : null;
+      charsC(c, g.w, font, cx, cy, g.fg, i => {
+        const s = spring(lt + 0.06 - i * 0.04, 3, 0.4);
+        return { dy: (1 - s) * -800, rot: (1 - s) * 0.4 * (i % 2 ? 1 : -1), col: cols ? cols[i % 5] : null };
+      });
+      break;
+    }
+    case 'rise': {
+      const r = charsC(c, g.w, font, cx, cy, g.fg, i => ({ dy: (1 - ev(lt, i * 0.035, i * 0.035 + 0.45)) * big * 1.1 }), { clip: true });
+      if (g.ac) { const p = ev(lt, 0.3, 0.75, E.ioExpo); c.fillStyle = g.ac; c.fillRect(cx - r.m.width / 2, cy + r.m.desc + 70, r.m.width * p, 12); }
+      break;
+    }
+    case 'stack': {
+      for (let k = -3; k <= 3; k++) {
+        const y = cy + k * 250 + (k ? ((lt * 400) % 250) * (k < 0 ? -1 : 1) * 0 : 0);
+        const off = (k % 2 ? 1 : -1) * (1 - E.outExpo(clamp(lt / 0.4))) * 500 + k * lt * 120;
+        if (k === 0) textC(c, g.w, font, cx, cy, g.fg);
+        else textC(c, g.w, font, cx + off, y, null, { stroke: rgba(K.white, 0.5), lw: 2.5 });
+      }
+      break;
+    }
+    case 'vertical': {
+      const chars = [...g.w], size = 150, gap = 152, top = cy - (chars.length - 1) * gap / 2;
+      chars.forEach((ch, i) => {
+        const p = ev(lt, i * 0.06, i * 0.06 + 0.5);
+        c.save(); c.globalAlpha = p; textC(c, ch, F(800, size), cx, top + i * gap - (1 - p) * 60, g.fg); c.restore();
+      });
+      const lp = ev(lt, 0.1, 0.8, E.ioExpo);
+      c.fillStyle = g.ac; c.fillRect(cx + 130, top - 70, 4, (chars.length - 1) * gap * lp + 140 * lp);
+      c.fillRect(cx - 134, top - 70 + ((chars.length - 1) * gap + 140) * (1 - lp), 4, ((chars.length - 1) * gap + 140) * lp);
+      break;
+    }
+    case 'zoom': {
+      const s = lerp(5, 1, ev(lt, 0, 0.3, E.outQuart));
+      c.save(); c.translate(cx, cy); c.scale(s, s); c.translate(-cx, -cy);
+      textC(c, g.w, font, cx, cy, g.fg); c.restore();
+      break;
+    }
+    case 'flip': {
+      charsC(c, g.w, font, cx, cy, g.fg, i => {
+        const s = spring(lt - i * 0.045, 2.6, 0.45);
+        return { sy: s, col: OBANG[i % 5] === K.white ? K.white : OBANG[i % 5] };
+      });
+      break;
+    }
+    case 'circle': {
+      const r = 1200 * ev(lt, 0, 0.45, E.ioExpo);
+      c.fillStyle = K.red; c.beginPath(); c.arc(cx, cy, Math.min(r, 340), 0, TAU); c.fill();
+      c.save(); c.beginPath(); c.arc(cx, cy, r * 0.9, 0, TAU); c.clip();
+      charsC(c, g.w, F(900, 300), cx, cy, K.white, i => ({ dx: (1 - ev(lt, 0.1 + i * 0.08, 0.5 + i * 0.08)) * (i ? 200 : -200) }));
+      c.restore();
+      break;
+    }
+    case 'type': {
+      const chars = [...g.w], n2 = Math.min(chars.length, Math.floor(lt / 0.06) + 1);
+      const shown = chars.slice(0, n2).join(''), m = metrics(g.w, font);
+      const x0 = cx - m.width / 2;
+      const r = textC(c, shown, font, x0, cy, g.fg, { align: 'left' });
+      const cw = metrics(shown, font).width;
+      if (Math.floor(lt * 6) % 2 === 0 || n2 < chars.length) { c.fillStyle = g.ac; c.fillRect(x0 + cw + 14, r.base - m.asc, 22, m.asc + 10); }
+      break;
+    }
+    case 'slice': {
+      const m = metrics(g.w, font), top = cy - (m.asc + m.desc) / 2 - 10, bh = (m.asc + m.desc + 20) / 4;
+      for (let b = 0; b < 4; b++) {
+        const off = (b % 2 ? 1 : -1) * 300 * (1 - E.outExpo(clamp(lt / 0.22)));
+        c.save(); c.beginPath(); c.rect(0, top + b * bh, W, bh + 0.5); c.clip(); textC(c, g.w, font, cx + off, cy, g.fg); c.restore();
+      }
+      break;
+    }
+    case 'track': textC(c, g.w, font, cx, cy, g.fg, { ls: lerp(90, -4, ev(lt, 0, 0.4)) }); break;
+    case 'whole': {
+      const p = ev(lt, 0, 0.35);
+      const m = metrics(g.w, F(800, 280));
+      c.save(); c.beginPath(); c.rect(0, cy - m.asc - 40, W, (m.asc + m.desc) * 1.1 + 80); c.clip();
+      textC(c, g.w, F(800, 280), cx, cy + (1 - p) * 300, g.fg); c.restore();
+      break;
+    }
+    case 'matra': {
+      const f2 = F(800, 280), m = metrics(g.w, f2);
+      const top = cy - (m.asc - m.desc) / 2 - m.asc * 0.05;
+      const lp = ev(lt, 0, 0.18, E.ioExpo), rp = ev(lt, 0.12, 0.4, E.ioCub);
+      c.save(); c.beginPath(); c.rect(0, 0, W, cy - (m.asc - m.desc) / 2 + (m.asc * 0.5) + (m.asc + m.desc) * rp); c.clip();
+      textC(c, g.w, f2, cx, cy, g.fg); c.restore();
+      c.fillStyle = K.red; c.fillRect(cx - m.width / 2 - 30, cy - m.asc * 0.62 - 40, (m.width + 60) * lp, 8);
+      void top;
+      break;
+    }
+    case 'rtl': {
+      const f2 = F(800, 300), m = metrics(g.w, f2), p = ev(lt, 0, 0.4, E.ioExpo);
+      c.save(); c.beginPath(); c.rect(cx + m.width / 2 + 40 - (m.width + 80) * p, 0, (m.width + 80) * p, H); c.clip();
+      textC(c, g.w, f2, cx - (1 - p) * 120, cy, g.fg); c.restore();
+      break;
+    }
+    case 'wave': charsC(c, g.w, font, cx, cy, g.fg, i => ({ dy: Math.sin(lt * 14 - i * 0.9) * 40 * (1 - clamp(lt / dur)) + (1 - ev(lt, i * 0.03, i * 0.03 + 0.3)) * 300 }), { clip: true }); break;
+    case 'pop': {
+      const s = spring(lt, 3.2, 0.35);
+      for (let k = 0; k < 3; k++) {
+        const p = prog(lt, k * 0.05, k * 0.05 + 0.45); if (p <= 0 || p >= 1) continue;
+        c.strokeStyle = rgba(K.white, 1 - p); c.lineWidth = 10 * (1 - p) + 1; c.beginPath(); c.arc(cx, cy, 150 + 600 * E.outExpo(p), 0, TAU); c.stroke();
+      }
+      c.save(); c.translate(cx, cy); c.scale(s, s); c.translate(-cx, -cy); textC(c, g.w, F(900, 380), cx, cy, g.fg); c.restore();
+      break;
+    }
+    case 'split': {
+      const [a, b] = g.w.split(' '), p = 1 - ev(lt, 0, 0.35);
+      const ma = metrics(a + ' ', font), mb = metrics(b, font), tot = ma.width + mb.width, x0 = cx - tot / 2;
+      textC(c, a, font, x0 - p * 700, cy, g.fg, { align: 'left' });
+      textC(c, b, font, x0 + ma.width + p * 700, cy, K.red, { align: 'left' });
+      break;
+    }
+  }
+  c.restore();
+  langLabel(c, g, lt, n);
+}
+
+// =====================================================================
+//  SCENE 0 — INTRO (0 → 4s): night, glowing 한지 screen, shadow "Hello"
+// =====================================================================
+const SCR = { x: 960 - 470, y: 540 - 300, w: 940, h: 560, cell: 94 };
+function hanjiScreen(c, t, light, opts = {}) {
+  const { x, y, w, h, cell } = SCR;
+  // warm glow spill
+  const sp = c.createRadialGradient(960, 520, 100, 960, 520, 1100);
+  sp.addColorStop(0, rgba(K.warm, 0.22 * light)); sp.addColorStop(1, rgba(K.warm, 0));
+  c.fillStyle = sp; c.fillRect(0, 0, W, H);
+  // paper
+  const g = c.createRadialGradient(960, 520, 50, 960, 520, 620);
+  g.addColorStop(0, mixc('#2A1A12', K.glow, light)); g.addColorStop(1, mixc('#1E130D', '#E7A85E', light));
+  c.fillStyle = g; c.fillRect(x, y, w, h);
+  c.save(); c.globalAlpha = 0.5 * light; c.drawImage(hanjiTex, x, y, w, h, x, y, w, h); c.restore();
+  if (opts.shadow) opts.shadow(c);
+  // lattice + frame
+  lattice(c, x, y, w, h, cell, 5, K.wood, opts.latP ?? 1);
+  c.strokeStyle = K.wood; c.lineWidth = 22; c.strokeRect(x - 11, y - 11, w + 22, h + 22);
+  c.fillStyle = K.wood; c.fillRect(959 - 7, y, 14, h);
+}
+function sIntro(c, t) {
+  bg(c, K.night);
+  const light = ev(t, 0.15, 1.3, E.ioCub) * (0.94 + 0.06 * Math.sin(t * 17) * Math.sin(t * 5.3));
+  const z = Math.exp(Math.log(14) * E.inExpo(prog(t, 3.35, 4.0)));
+  const fx = 960 + SCR.cell * 1.5, fy = 520 - SCR.cell * 0.5; // zoom target: a glowing cell
+  c.save(); c.translate(fx, fy); c.scale(z, z); c.translate(-fx, -fy);
+  hanjiScreen(c, t, light, {
+    latP: ev(t, 0.1, 1.5, E.ioCub),
+    shadow: c2 => {
+      if (t < 1.4) return;
+      const a = ev(t, 1.4, 2.1, E.lin), s = lerp(1.35, 1, ev(t, 1.4, 2.6, E.outCub));
+      const blur = lerp(14, 2, ev(t, 1.4, 2.6, E.outCub));
+      c2.save(); c2.beginPath(); c2.rect(SCR.x, SCR.y, SCR.w, SCR.h); c2.clip();
+      c2.filter = `blur(${blur.toFixed(1)}px)`; c2.globalAlpha = a * 0.85;
+      c2.translate(960, 520); c2.scale(s, s); c2.translate(-960, -520);
+      textC(c2, 'Hello', F(900, 260), 960, 520, '#2B160C');
+      c2.restore(); c2.filter = 'none';
+    },
+  });
+  c.restore();
+  // audience silhouettes / foreground floor
+  c.save(); c.globalAlpha = 1 - ev(t, 3.3, 3.6, E.lin);
+  const fg = c.createLinearGradient(0, 860, 0, 1080); fg.addColorStop(0, 'rgba(0,0,0,0)'); fg.addColorStop(1, 'rgba(0,0,0,0.85)');
+  c.fillStyle = fg; c.fillRect(0, 860, W, 220);
+  if (t > 2.2) textC(c, 'ENGLISH', F(600, 22), 960, 960, rgba(K.glow, 0.8 * ev(t, 2.2, 2.6, E.lin)), { ls: 10 });
+  c.restore();
+  const fl = ev(t, 3.75, 4.0, E.inCub);
+  if (fl > 0) { c.fillStyle = rgba(K.glow, fl); c.fillRect(-100, -100, W + 200, H + 200); }
+}
+
+// =====================================================================
+//  SCENE 1+2 — GREETING MONTAGE (4 → 18s)
+// =====================================================================
+function sMontage(c, t) { // t = global
+  let idx = 0; for (let i = 0; i < G.length; i++) if (t >= G[i].t) idx = i;
+  const g = G[idx];
+  drawGreeting(c, g, t - g.t, idx + 2);
+  // 단청 band wipes on a few cuts (accent)
+  for (const at of [7.0, 10.0, 12.0, 16.0]) {
+    const p = prog(t, at - 0.18, at + 0.18); if (p <= 0 || p >= 1) continue;
+    const n = DAN.length, bw = W / n;
+    for (let i = 0; i < n; i++) {
+      const q = Math.sin(clamp(p * 1.6 - i * 0.07) * Math.PI);
+      c.fillStyle = DAN[i]; c.fillRect(i * bw - 1, H / 2 - H / 2 * q - 2, bw + 2, H * q + 4);
+    }
+  }
+  // intro flash carry-in
+  const fl = 1 - ev(t, 4.0, 4.22, E.outCub);
+  if (fl > 0) { c.fillStyle = rgba(K.glow, fl); c.fillRect(-100, -100, W + 200, H + 200); }
+}
+
+// =====================================================================
+//  SCENE 3 — WALL OF GREETINGS (18 → 20s)
+// =====================================================================
+const WALL = (() => {
+  const words = ['Hello', 'Hola', 'Bonjour', 'Ciao', 'こんにちは', 'Olá', 'Привет', '你好', 'Merhaba', 'Hallo', 'Xin chào', 'สวัสดี', 'नमस्ते', 'مرحبا', 'Γειά σου', 'Aloha'];
+  const R = rng(4), cells = [];
+  for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) cells.push([i, j]);
+  for (let i = cells.length - 1; i > 0; i--) { const k = Math.floor(R() * (i + 1)); [cells[i], cells[k]] = [cells[k], cells[i]]; }
+  return words.map((w, i) => ({ w, x: 240 + cells[i][0] * 480 + (R() - 0.5) * 30, y: 135 + cells[i][1] * 270 + (R() - 0.5) * 30,
+    size: 90 + R() * 70, col: [K.red, K.yellow, K.white, K.blue, K.green, K.warm][i % 6], t: 18.0 + i * 0.125, rot: (R() - 0.5) * 0.12 }));
+})();
+function drawWall(c, t, suck = 0) {
+  for (const wd of WALL) {
+    if (t < wd.t) continue;
+    const s = spring(t - wd.t, 3.2, 0.42) * (1 - suck * 0.85);
+    const x = lerp(wd.x, 960, E.inExpo(suck)), y = lerp(wd.y, 520, E.inExpo(suck));
+    c.save(); c.translate(x, y); c.rotate(wd.rot * (1 - suck) + suck * 2); c.scale(s, s);
+    c.globalAlpha = 1 - E.inExpo(suck) * 0.6;
+    const wt = wd.size > 130 ? 900 : 800, mw = metrics(wd.w, F(wt, wd.size)).width, sz = Math.min(wd.size, wd.size * 400 / mw);
+    textC(c, wd.w, F(wt, sz), 0, 0, wd.col); c.restore();
+  }
+}
+function sWall(c, t) {
+  bg(c, K.ink);
+  lattice(c, 0, 0, W, H, 135, 1.2, rgba(K.warm, 0.08), 1);
+  drawWall(c, t, 0);
+}
+
+// =====================================================================
+//  SCENE 4 — DOORS CLOSE, BREATH (20 → 22s)
+// =====================================================================
+function door(c, x, w, light, shadowFn) {
+  const fr = 26;
+  c.fillStyle = K.wood; c.fillRect(x, 0, w, H);
+  const ix = x + fr, iw = w - fr * 2, iy = fr, ih = H - fr * 2;
+  const g = c.createRadialGradient(960, 540, 80, 960, 540, 1100);
+  g.addColorStop(0, mixc('#24150D', K.glow, light)); g.addColorStop(1, mixc('#1B110B', '#D9934C', light));
+  c.fillStyle = g; c.fillRect(ix, iy, iw, ih);
+  c.save(); c.globalAlpha = 0.45 * light; c.drawImage(hanjiTex, ix, iy, iw, ih, ix, iy, iw, ih); c.restore();
+  if (shadowFn) { c.save(); c.beginPath(); c.rect(ix, iy, iw, ih); c.clip(); shadowFn(c); c.restore(); }
+  lattice(c, ix, iy, iw, ih, 120, 6, K.wood, 1);
+}
+function doors(c, open, light, shadowFn) { // open: 0 closed, 1 fully open
+  const hw = W / 2, off = open * (hw + 40);
+  door(c, -off, hw, light, shadowFn);
+  door(c, hw + off, hw, light, shadowFn);
+  c.fillStyle = '#1E120B'; c.fillRect(hw - 6 - off, 0, 12, H * (open < 1 ? 1 : 0));
+}
+function eoseowaShadow(t) {
+  return c2 => {
+    const a = ev(t, 20.9, 21.8, E.lin);
+    if (a <= 0) return;
+    const s = lerp(1.25, 1.02, ev(t, 20.9, 22.0, E.outCub));
+    c2.filter = `blur(${lerp(16, 4, ev(t, 20.9, 22.0, E.lin)).toFixed(1)}px)`; c2.globalAlpha = a * 0.8;
+    c2.translate(960, 520); c2.scale(s, s); c2.translate(-960, -520);
+    textC(c2, '어서와', F(900, 330), 960, 520, '#2A150B');
+    c2.filter = 'none';
+  };
+}
+function sBreath(c, t) {
+  bg(c, K.ink);
+  lattice(c, 0, 0, W, H, 135, 1.2, rgba(K.warm, 0.08 * (1 - ev(t, 20.0, 20.5, E.lin))), 1);
+  drawWall(c, t, prog(t, 20.0, 20.7));
+  const close = ev(t, 20.05, 20.75, E.ioExpo);
+  const light = ev(t, 20.8, 21.9, E.ioCub) * 0.9;
+  doors(c, 1 - close, light, eoseowaShadow(t));
+}
+
+// =====================================================================
+//  SCENE 5 — 어서와 (22 → 30s)
+// =====================================================================
+const DRIFT = (() => {
+  const words = ['Hello', 'Hola', 'Bonjour', 'Ciao', 'こんにちは', 'Olá', 'Привет', '你好', 'Merhaba', 'Hallo', 'Xin chào', 'สวัสดี', 'नमस्ते', 'مرحبا', 'Γειά σου', 'Aloha', 'Jambo', 'Hej', 'Kia ora', 'Halo'];
+  const R = rng(61); return words.map((w, i) => ({ w, x: R() * W, y0: R() * H, v: 14 + R() * 26, s: 28 + R() * 34 }));
+})();
+const DOTS = (() => { const R = rng(17), d = []; for (let i = 0; i < 26; i++) { const a = R() * TAU, r = 380 + R() * 420; d.push({ x: 960 + Math.cos(a) * r * 1.25, y: 470 + Math.sin(a) * r * 0.62, s: 5 + R() * 8, col: OBANG[i % 5] === K.white ? K.yellow : OBANG[i % 5], d: R() * 0.25 }); } return d; })();
+const sweepCv = document.createElement('canvas'); sweepCv.width = W; sweepCv.height = H;
+const sctx = sweepCv.getContext('2d');
+function drawEoseowa(c, lt) {
+  const font = F(900, 400);
+  const slam = lerp(1.5, 1, ev(lt, 0, 0.28, E.outQuart));
+  c.save(); c.translate(960, 470); c.scale(slam, slam); c.translate(-960, -470);
+  charsC(c, '어서와', font, 960, 470, K.ink, i => {
+    let hop = 0;
+    for (const b of [0.5, 1.0, 1.5, 4.0, 4.5, 5.0]) { const q = prog(lt, b + i * 0.08, b + i * 0.08 + 0.3); hop += Math.sin(q * Math.PI) * (b < 3 ? 30 : 18); }
+    return { dy: -hop, col: i === 2 ? K.red : K.ink };
+  });
+  c.restore();
+}
+function sWelcome(c, t) { // t = global
+  const lt = t - 22;
+  paperBg(c, K.paper);
+  const push = lerp(1, 1.05, ev(lt, 0, 8, E.ioCub));
+  c.save(); c.translate(960, 500); c.scale(push, push); c.translate(-960, -500);
+  // drifting greetings (faint)
+  c.save(); c.globalAlpha = 0.11 * ev(lt, 0.4, 1.4, E.lin);
+  for (const d of DRIFT) { let y = ((d.y0 - lt * d.v) % (H + 100) + H + 100) % (H + 100) - 50; if (y > 250 && y < 880 && d.x > 330 && d.x < 1590) continue; textC(c, d.w, F(700, d.s), d.x, y, K.ink); }
+  c.restore();
+  // 오방색 dots burst
+  for (const d of DOTS) {
+    const p = spring(lt - d.d, 2.6, 0.45);
+    if (p <= 0) continue;
+    const x = lerp(960, d.x, Math.min(1.1, p)) + Math.sin(lt * 0.9 + d.d * 20) * 10, y = lerp(470, d.y, Math.min(1.1, p)) + Math.cos(lt * 1.1 + d.d * 30) * 8;
+    c.fillStyle = d.col; c.beginPath(); c.arc(x, y, d.s * clamp(p), 0, TAU); c.fill();
+  }
+  // 어서와 — slam, syllables bounce on the beat, then a light sweep through the letters
+  drawEoseowa(c, lt);
+  const sw = prog(lt, 2.6, 3.5);
+  if (sw > 0 && sw < 1) {
+    sctx.setTransform(1, 0, 0, 1, 0, 0); sctx.clearRect(0, 0, W, H);
+    drawEoseowa(sctx, lt);
+    sctx.globalCompositeOperation = 'source-in';
+    const gx = lerp(300, 1620, E.ioCub(sw)), lg = sctx.createLinearGradient(gx - 180, 0, gx + 180, 0);
+    lg.addColorStop(0, 'rgba(255,226,170,0)'); lg.addColorStop(0.5, 'rgba(255,236,196,0.75)'); lg.addColorStop(1, 'rgba(255,226,170,0)');
+    sctx.fillStyle = lg; sctx.fillRect(0, 0, W, H);
+    sctx.globalCompositeOperation = 'source-over';
+    c.drawImage(sweepCv, 0, 0);
+  }
+  // 단청 band under the word
+  dancheongBand(c, 960 - 520, 735, 1040, 30, prog(lt, 0.7, 1.6));
+  // WELCOME TO KOREA
+  const wt = 'WELCOME TO KOREA', wf = F(600, 34), wm = metrics(wt, wf, 16);
+  charsC(c, wt, wf, 960, 830, K.ink, i => ({ dy: (1 - ev(lt, 1.1 + i * 0.025, 1.6 + i * 0.025)) * 50 }), { clip: true, ls: 16 });
+  void wm;
+  c.restore();
+  // lattice border frame drawing in (accent)
+  const bp = ev(lt, 3.6, 5.4, E.ioCub);
+  if (bp > 0) {
+    c.save(); c.globalAlpha = 0.9;
+    lattice(c, 0, 0, W, 60, 60, 2, rgba(K.wood, 0.55), bp); lattice(c, 0, H - 60, W, 60, 60, 2, rgba(K.wood, 0.55), bp);
+    c.restore();
+  }
+  // doors burst open over the start
+  if (lt < 0.6) {
+    const open = ev(lt, 0, 0.55, E.outExpo);
+    doors(c, open, 0.9, eoseowaShadow(t));
+    const fl = 1 - ev(lt, 0, 0.35, E.outCub);
+    c.fillStyle = rgba(K.glow, fl * 0.9); c.fillRect(-100, -100, W + 200, H + 200);
+  }
+}
+
+// =====================================================================
+//  TIMELINE + FX
+// =====================================================================
+const SCENES = [
+  { a: 0, b: 4, f: (c, t) => sIntro(c, t) },
+  { a: 4, b: 18, f: (c, t) => sMontage(c, t + 4) },
+  { a: 18, b: 20, f: (c, t) => sWall(c, t + 18) },
+  { a: 20, b: 22, f: (c, t) => sBreath(c, t + 20) },
+  { a: 22, b: 30.1, f: (c, t) => sWelcome(c, t + 22) },
+];
+const IMPACTS = [[4.0, 10], [8.0, 8], [12.0, 8], [15.5, 8], [16.0, 6], [20.75, 10], [22.0, 28], [22.5, 6], [23.0, 6], [23.5, 6]];
+const CA_HITS = [[4.0, 8], [8.0, 6], [12.0, 8], [16.0, 6], [18.0, 6], [20.75, 8], [22.0, 16]];
+function shake(t) {
+  let x = 0, y = 0;
+  for (const [ti, a] of IMPACTS) { if (t < ti || t > ti + 0.6) continue; const d = t - ti, e = a * Math.exp(-d * 11); x += e * Math.sin(d * 71 + ti * 13); y += e * Math.cos(d * 59 + ti * 7); }
+  return [x, y];
+}
+function caAmount(t) {
+  let a = 0;
+  for (const [ti, v] of CA_HITS) if (t >= ti - 0.05 && t < ti + 0.5) a += v * Math.exp(-Math.max(0, t - ti) * 9) * (t < ti ? (t - ti + 0.05) / 0.05 : 1);
+  return a;
+}
+function drawScene(c, t) {
+  c.save(); const [sx, sy] = shake(t); c.translate(sx, sy);
+  for (const s of SCENES) if (t >= s.a && t < s.b) s.f(c, t - s.a);
+  c.restore();
+}
+const grain = (() => {
+  const cv = document.createElement('canvas'); cv.width = cv.height = 256;
+  const g = cv.getContext('2d'), im = g.createImageData(256, 256), R = rng(1234);
+  for (let i = 0; i < im.data.length; i += 4) { const v = R() * 255; im.data[i] = im.data[i + 1] = im.data[i + 2] = v; im.data[i + 3] = 255; }
+  g.putImageData(im, 0, 0); return cv;
+})();
+let grainPat = null;
+function post(c, t, frame) {
+  const vg = c.createRadialGradient(W / 2, H / 2, H * 0.42, W / 2, H / 2, H * 1.05);
+  vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(20,8,0,0.3)');
+  c.fillStyle = vg; c.fillRect(0, 0, W, H);
+  if (!grainPat) grainPat = c.createPattern(grain, 'repeat');
+  const R = rng(frame * 7 + 3);
+  c.save(); c.globalCompositeOperation = 'overlay'; c.globalAlpha = 0.09;
+  c.translate(-R() * 256, -R() * 256); c.fillStyle = grainPat; c.fillRect(0, 0, W + 256, H + 256); c.restore();
+  const fo = ev(t, 29.3, 29.98, E.ioCub);
+  if (fo > 0) { c.fillStyle = `rgba(15,11,16,${fo})`; c.fillRect(0, 0, W, H); }
+}
+
+// =====================================================================
+//  FRAME RENDER
+// =====================================================================
+const acc = new Float32Array(W * H * 4);
+const outImg = octx.createImageData(W, H);
+window.renderFrame = function (frame) {
+  const t = frame / FPS, n = SAMPLES;
+  acc.fill(0);
+  for (let s = 0; s < n; s++) {
+    const ts = t + ((n === 1 ? 0 : s / (n - 1)) - 0.5) * SHUTTER / FPS;
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; ctx.filter = 'none';
+    drawScene(ctx, Math.max(0, Math.min(DUR - 1e-4, ts)));
+    const d = ctx.getImageData(0, 0, W, H).data;
+    for (let i = 0; i < d.length; i++) acc[i] += d[i];
+  }
+  const o = outImg.data, inv = 1 / n, ca = Math.round(caAmount(t));
+  if (ca === 0) {
+    for (let i = 0; i < o.length; i += 4) { o[i] = acc[i] * inv; o[i + 1] = acc[i + 1] * inv; o[i + 2] = acc[i + 2] * inv; o[i + 3] = 255; }
+  } else {
+    for (let y = 0; y < H; y++) { const row = y * W; for (let x = 0; x < W; x++) {
+      const dx = Math.round(ca * (x - W / 2) / (W / 2));
+      const xr = Math.min(W - 1, Math.max(0, x + dx)), xb = Math.min(W - 1, Math.max(0, x - dx)), i = (row + x) * 4;
+      o[i] = acc[(row + xr) * 4] * inv; o[i + 1] = acc[i + 1] * inv; o[i + 2] = acc[(row + xb) * 4 + 2] * inv; o[i + 3] = 255; } }
+  }
+  octx.putImageData(outImg, 0, 0);
+  post(octx, t, frame);
+  return true;
+};
+window.ready = (async () => {
+  const sample = 'Hello 어서와 こんにちは 你好 สวัสดี नमस्ते مرحبا Привет Γειά';
+  await Promise.all([900, 800, 700, 600].map(w => document.fonts.load(F(w, 100), sample)));
+  // warm-up so every fallback face is resolved before frame 0
+  ctx.font = F(900, 100); ctx.fillText(sample, 0, -200); ctx.font = F(800, 100); ctx.fillText(sample, 0, -200);
+  return document.fonts.check(F(900, 100), 'Hello');
+})();
+</script>
+</body>
+</html>
