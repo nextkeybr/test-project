@@ -176,8 +176,8 @@ const G = [
   { t: 13.0, d: .5, w: 'สวัสดี', lang: 'ภาษาไทย', bg: K.hanji, fg: K.green, fx: 'whole', paper: 1 },
   { t: 13.5, d: .5, w: 'नमस्ते', lang: 'हिन्दी', bg: K.yellow, fg: K.ink, fx: 'matra' },
   { t: 14.0, d: .5, w: 'مرحبا', lang: 'العربية', bg: K.green, fg: K.white, fx: 'rtl' },
-  { t: 14.5, d: .5, w: 'Γειά σου', lang: 'ΕΛΛΗΝΙΚΑ', bg: K.blue, fg: K.white, fx: 'rise' },
-  { t: 15.0, d: .5, w: 'Aloha', lang: 'HAWAIʻI', bg: K.hanji, fg: K.red, fx: 'wave', paper: 1 },
+  { t: 14.5, d: .5, w: 'Γεια σου', lang: 'ΕΛΛΗΝΙΚΑ', bg: K.blue, fg: K.white, fx: 'rise' },
+  { t: 15.0, d: .5, w: 'Aloha', lang: 'ʻŌLELO HAWAIʻI', bg: K.hanji, fg: K.red, fx: 'wave', paper: 1 },
   { t: 15.5, d: .5, w: 'Jambo', lang: 'KISWAHILI', bg: K.ink, fg: K.yellow, fx: 'drop', multi: 1 },
   { t: 16.0, d: .5, w: 'Hej', lang: 'SVENSKA', bg: K.red, fg: K.white, fx: 'pop' },
   { t: 16.5, d: .5, w: 'Kia ora', lang: 'TE REO MĀORI', bg: K.hanji, fg: K.blue, fx: 'split', paper: 1 },
@@ -399,7 +399,7 @@ function sMontage(c, t) { // t = global
 //  SCENE 3 — WALL OF GREETINGS (18 → 20s)
 // =====================================================================
 const WALL = (() => {
-  const words = ['Hello', 'Hola', 'Bonjour', 'Ciao', 'こんにちは', 'Olá', 'Привет', '你好', 'Merhaba', 'Hallo', 'Xin chào', 'สวัสดี', 'नमस्ते', 'مرحبا', 'Γειά σου', 'Aloha'];
+  const words = ['Hello', 'Hola', 'Bonjour', 'Ciao', 'こんにちは', 'Olá', 'Привет', '你好', 'Merhaba', 'Hallo', 'Xin chào', 'สวัสดี', 'नमस्ते', 'مرحبا', 'Γεια σου', 'Aloha'];
   const R = rng(4), cells = [];
   for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) cells.push([i, j]);
   for (let i = cells.length - 1; i > 0; i--) { const k = Math.floor(R() * (i + 1)); [cells[i], cells[k]] = [cells[k], cells[i]]; }
@@ -424,85 +424,167 @@ function sWall(c, t) {
 }
 
 // =====================================================================
-//  SCENE 4 — DOORS CLOSE, BREATH (20 → 22s)
+//  SCENE 4 — BREATH (20 → 22s): greetings collapse to a point of light,
+//  an eave line (처마선) sweeps out, roof silhouette, 서까래 medallions, 단청 band
 // =====================================================================
-function door(c, x, w, light, shadowFn) {
-  const fr = 26;
-  c.fillStyle = K.wood; c.fillRect(x, 0, w, H);
-  const ix = x + fr, iw = w - fr * 2, iy = fr, ih = H - fr * 2;
-  const g = c.createRadialGradient(960, 540, 80, 960, 540, 1100);
-  g.addColorStop(0, mixc('#24150D', K.glow, light)); g.addColorStop(1, mixc('#1B110B', '#D9934C', light));
-  c.fillStyle = g; c.fillRect(ix, iy, iw, ih);
-  c.save(); c.globalAlpha = 0.45 * light; c.drawImage(hanjiTex, ix, iy, iw, ih, ix, iy, iw, ih); c.restore();
-  if (shadowFn) { c.save(); c.beginPath(); c.rect(ix, iy, iw, ih); c.clip(); shadowFn(c); c.restore(); }
-  lattice(c, ix, iy, iw, ih, 120, 6, K.wood, 1);
+// rafter-end medallion (서까래 마구리): concentric 단청 rings
+const RINGS = [K.green, K.white, K.red, K.white, K.blue, K.yellow];
+function medallion(c, x, y, r, p = 1, rot = 0) {
+  for (let k = 0; k < RINGS.length; k++) {
+    const q = ev(p, k * 0.08, 0.5 + k * 0.08, E.outBack);
+    const rr = r * (1 - k / RINGS.length) * q;
+    if (rr <= 0.3) continue;
+    c.fillStyle = RINGS[k]; c.beginPath(); c.arc(x, y, rr, 0, TAU); c.fill();
+  }
+  // tiny lotus dots
+  if (p > 0.6) { c.save(); c.translate(x, y); c.rotate(rot); c.fillStyle = K.white;
+    for (let k = 0; k < 4; k++) { c.rotate(TAU / 4); c.beginPath(); c.arc(r * 0.62, 0, r * 0.06 * ev(p, 0.6, 1), 0, TAU); c.fill(); }
+    c.restore(); }
 }
-function doors(c, open, light, shadowFn) { // open: 0 closed, 1 fully open
-  const hw = W / 2, off = open * (hw + 40);
-  door(c, -off, hw, light, shadowFn);
-  door(c, hw + off, hw, light, shadowFn);
-  c.fillStyle = '#1E120B'; c.fillRect(hw - 6 - off, 0, 12, H * (open < 1 ? 1 : 0));
-}
-function eoseowaShadow(t) {
-  return c2 => {
-    const a = ev(t, 20.9, 21.8, E.lin);
-    if (a <= 0) return;
-    const s = lerp(1.25, 1.02, ev(t, 20.9, 22.0, E.outCub));
-    c2.filter = `blur(${lerp(16, 4, ev(t, 20.9, 22.0, E.lin)).toFixed(1)}px)`; c2.globalAlpha = a * 0.8;
-    c2.translate(960, 520); c2.scale(s, s); c2.translate(-960, -520);
-    textC(c2, '어서와', F(900, 330), 960, 520, '#2A150B');
-    c2.filter = 'none';
-  };
+const EAVE = { y0: 630, lift: 210, x0: -120, x1: W + 120 };
+const eaveY = u => EAVE.y0 - EAVE.lift * Math.pow(Math.abs(2 * u - 1), 3.4);
+const eaveX = u => lerp(EAVE.x0, EAVE.x1, u);
+function eavePath(c, u0, u1, off = 0) {
+  c.beginPath();
+  for (let i = 0; i <= 80; i++) { const u = lerp(u0, u1, i / 80); const x = eaveX(u), y = eaveY(u) + off; i ? c.lineTo(x, y) : c.moveTo(x, y); }
 }
 function sBreath(c, t) {
-  bg(c, K.ink);
-  lattice(c, 0, 0, W, H, 135, 1.2, rgba(K.warm, 0.08 * (1 - ev(t, 20.0, 20.5, E.lin))), 1);
-  drawWall(c, t, prog(t, 20.0, 20.7));
-  const close = ev(t, 20.05, 20.75, E.ioExpo);
-  const light = ev(t, 20.8, 21.9, E.ioCub) * 0.9;
-  doors(c, 1 - close, light, eoseowaShadow(t));
+  const lt = t - 20;
+  // night sky with a warm horizon
+  const sky = c.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, '#120F22'); sky.addColorStop(0.65, '#1C1424'); sky.addColorStop(1, '#3A1F17');
+  c.fillStyle = sky; c.fillRect(-200, -200, W + 400, H + 400);
+  // soft backlight so the roof silhouette reads
+  const bl = ev(lt, 0.8, 1.6, E.lin);
+  if (bl > 0) { const g2 = c.createRadialGradient(960, 330, 0, 960, 330, 900); g2.addColorStop(0, rgba('#7A4E6E', 0.55 * bl)); g2.addColorStop(0.5, rgba('#4A2E55', 0.3 * bl)); g2.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g2; c.fillRect(0, 0, W, H); }
+  // greetings collapse into a point of light
+  if (lt < 0.8) drawWall(c, t, prog(lt, 0, 0.7));
+  const pt = Math.sin(clamp(prog(lt, 0.45, 1.1)) * Math.PI);
+  if (pt > 0) {
+    const g = c.createRadialGradient(960, 600, 0, 960, 600, 260 * pt + 1);
+    g.addColorStop(0, rgba(K.glow, 0.95)); g.addColorStop(0.2, rgba(K.warm, 0.5)); g.addColorStop(1, rgba(K.warm, 0));
+    c.fillStyle = g; c.fillRect(0, 0, W, H);
+  }
+  const zoom = 1 + 0.5 * E.inExpo(prog(lt, 1.6, 2.0));
+  c.save(); c.translate(960, 560); c.scale(zoom, zoom); c.translate(-960, -560);
+  // roof silhouette (rises behind the line)
+  const sil = ev(lt, 0.85, 1.5, E.outCub);
+  if (sil > 0) {
+    c.save(); c.translate(0, (1 - sil) * 120); c.globalAlpha = sil;
+    c.fillStyle = '#07060B';
+    c.beginPath();
+    eavePath(c, 0, 1);
+    const ridgeY = 250, rx0 = 360, rx1 = W - 360;
+    c.lineTo(EAVE.x1, eaveY(1) - 40);
+    c.quadraticCurveTo(rx1 + 220, ridgeY + 120, rx1, ridgeY);
+    c.quadraticCurveTo(960, ridgeY + 26, rx0, ridgeY);
+    c.quadraticCurveTo(rx0 - 220, ridgeY + 120, EAVE.x0, eaveY(0) - 40);
+    c.closePath(); c.fill();
+    // warm rim light along the ridge + upturned ridge ends
+    c.strokeStyle = rgba(K.warm, 0.35); c.lineWidth = 3; c.beginPath(); c.moveTo(rx0, ridgeY); c.quadraticCurveTo(960, ridgeY + 26, rx1, ridgeY); c.stroke();
+    c.fillStyle = '#07060B'; for (const [x, d] of [[rx0, -1], [rx1, 1]]) { c.beginPath(); c.moveTo(x - d * 10, ridgeY + 8); c.quadraticCurveTo(x + d * 30, ridgeY - 2, x + d * 46, ridgeY - 34); c.lineTo(x + d * 40, ridgeY + 14); c.closePath(); c.fill(); }
+    // ridge tips + faint roof-tile ribs
+    c.strokeStyle = rgba(K.warm, 0.10); c.lineWidth = 2;
+    for (let k = 1; k < 26; k++) { const u = k / 26; c.beginPath(); c.moveTo(lerp(rx0, rx1, u), ridgeY + 14 + 6 * Math.sin(u * Math.PI)); c.lineTo(eaveX(lerp(0.08, 0.92, u)), eaveY(lerp(0.08, 0.92, u)) - 8); c.stroke(); }
+    c.restore();
+  }
+  // the eave line sweeps out from the centre
+  const ep = ev(lt, 0.7, 1.35, E.ioExpo);
+  if (ep > 0) {
+    c.save(); c.shadowColor = rgba(K.warm, 0.8); c.shadowBlur = 18;
+    eavePath(c, 0.5 - ep / 2, 0.5 + ep / 2); c.strokeStyle = '#F1CB84'; c.lineWidth = 6; c.stroke();
+    c.restore();
+  }
+  // 단청 band following the curve
+  const bp = ev(lt, 1.05, 1.65, E.ioExpo);
+  if (bp > 0) DAN.forEach((col, k) => {
+    eavePath(c, 0.5 - bp / 2, 0.5 + bp / 2, 10 + k * 6); c.strokeStyle = col; c.lineWidth = 6.5; c.stroke();
+  });
+  // 서까래 medallions pop from the centre outwards
+  const NM = 21;
+  for (let k = 0; k < NM; k++) {
+    const u = 0.04 + 0.92 * k / (NM - 1), d = Math.abs(k - (NM - 1) / 2);
+    const p = prog(lt, 1.15 + d * 0.035, 1.6 + d * 0.035);
+    if (p <= 0) continue;
+    medallion(c, eaveX(u), eaveY(u) + 90, 30, p, lt * 0.8);
+  }
+  c.restore();
+  bandWipe(c, t, 22.0);
+}
+// 단청 stripes wipe (used across the drop)
+function bandWipe(c, t, at) {
+  const p = prog(t, at - 0.16, at + 0.2); if (p <= 0 || p >= 1) return;
+  const n = DAN.length, bw = W / n;
+  for (let i = 0; i < n; i++) {
+    const q = Math.sin(clamp(p * 1.5 - i * 0.06) * Math.PI);
+    c.fillStyle = DAN[i]; c.fillRect(i * bw - 1, H / 2 - H / 2 * q - 2, bw + 2, H * q + 4);
+  }
 }
 
 // =====================================================================
 //  SCENE 5 — 어서와 (22 → 30s)
 // =====================================================================
-const DRIFT = (() => {
-  const words = ['Hello', 'Hola', 'Bonjour', 'Ciao', 'こんにちは', 'Olá', 'Привет', '你好', 'Merhaba', 'Hallo', 'Xin chào', 'สวัสดี', 'नमस्ते', 'مرحبا', 'Γειά σου', 'Aloha', 'Jambo', 'Hej', 'Kia ora', 'Halo'];
-  const R = rng(61); return words.map((w, i) => ({ w, x: R() * W, y0: R() * H, v: 14 + R() * 26, s: 28 + R() * 34 }));
-})();
-const DOTS = (() => { const R = rng(17), d = []; for (let i = 0; i < 26; i++) { const a = R() * TAU, r = 380 + R() * 420; d.push({ x: 960 + Math.cos(a) * r * 1.25, y: 470 + Math.sin(a) * r * 0.62, s: 5 + R() * 8, col: OBANG[i % 5] === K.white ? K.yellow : OBANG[i % 5], d: R() * 0.25 }); } return d; })();
+const WELCOMES = '어서와  ·  WELCOME  ·  BIENVENIDO  ·  BIENVENUE  ·  WILLKOMMEN  ·  BENVENUTO  ·  BEM-VINDO  ·  ようこそ  ·  欢迎  ·  ';
+const MEDS = (() => { const R = rng(17), d = []; for (let i = 0; i < 16; i++) { const a = i / 16 * TAU + R() * 0.3, r = 420 + R() * 330; d.push({ x: 960 + Math.cos(a) * r * 1.3, y: 470 + Math.sin(a) * r * 0.66, s: 12 + R() * 14, d: R() * 0.3, ph: R() * TAU }); } return d; })();
 const sweepCv = document.createElement('canvas'); sweepCv.width = W; sweepCv.height = H;
 const sctx = sweepCv.getContext('2d');
-function drawEoseowa(c, lt) {
+const SYL_COL = [K.ink, K.ink, K.red], SYL_ALT = [K.blue, K.green, K.yellow];
+function sylColor(i, lt) {
+  const f1 = 3.0 + i * 0.08, f2 = 4.5 + i * 0.08;
+  return lt >= f1 + 0.11 && lt < f2 + 0.11 ? SYL_ALT[i] : SYL_COL[i];
+}
+function drawEoseowa(c, lt, o = {}) {
   const font = F(900, 400);
-  const slam = lerp(1.5, 1, ev(lt, 0, 0.28, E.outQuart));
-  c.save(); c.translate(960, 470); c.scale(slam, slam); c.translate(-960, -470);
+  const pump = lt > 0.5 ? 1 + 0.028 * Math.exp(-((lt - 0.5) % 0.5) * 11) : 1;
+  c.save(); c.translate(960, 470); c.scale(pump, pump); c.translate(-960, -470);
   charsC(c, '어서와', font, 960, 470, K.ink, i => {
+    const st = i * 0.09, p = spring(lt - st, 2.8, 0.45);
+    if (lt < st) return { a: 0 };
     let hop = 0;
-    for (const b of [0.5, 1.0, 1.5, 4.0, 4.5, 5.0]) { const q = prog(lt, b + i * 0.08, b + i * 0.08 + 0.3); hop += Math.sin(q * Math.PI) * (b < 3 ? 30 : 18); }
-    return { dy: -hop, col: i === 2 ? K.red : K.ink };
+    for (const b of [0.5, 1.0, 1.5, 4.0, 4.5, 5.0, 6.0]) { const q = prog(lt, b + i * 0.08, b + i * 0.08 + 0.3); hop += Math.sin(q * Math.PI) * (b < 3 ? 30 : 18); }
+    let flip = 1;
+    for (const fb of [3.0, 4.5]) { const q = prog(lt, fb + i * 0.08, fb + i * 0.08 + 0.22); if (q > 0 && q < 1) flip = Math.abs(Math.cos(q * Math.PI)); }
+    const sc = lerp(2.3, 1, p);
+    return { dy: -hop + (1 - p) * [-60, 80, -40][i], rot: (1 - p) * [-0.35, 0.22, 0.4][i], sx: sc, sy: sc * flip, a: clamp((lt - st) / 0.04),
+      col: o.color || sylColor(i, lt) };
   });
   c.restore();
 }
 function sWelcome(c, t) { // t = global
   const lt = t - 22;
   paperBg(c, K.paper);
-  const push = lerp(1, 1.05, ev(lt, 0, 8, E.ioCub));
+  const push = lerp(1, 1.06, ev(lt, 0, 8, E.ioCub)) * (1 + 0.04 * Math.exp(-Math.max(0, lt - 6.0) * 6) * (lt > 6.0 ? 1 : 0));
   c.save(); c.translate(960, 500); c.scale(push, push); c.translate(-960, -500);
-  // drifting greetings (faint)
-  c.save(); c.globalAlpha = 0.11 * ev(lt, 0.4, 1.4, E.lin);
-  for (const d of DRIFT) { let y = ((d.y0 - lt * d.v) % (H + 100) + H + 100) % (H + 100) - 50; if (y > 250 && y < 880 && d.x > 330 && d.x < 1590) continue; textC(c, d.w, F(700, d.s), d.x, y, K.ink); }
-  c.restore();
-  // 오방색 dots burst
-  for (const d of DOTS) {
-    const p = spring(lt - d.d, 2.6, 0.45);
-    if (p <= 0) continue;
-    const x = lerp(960, d.x, Math.min(1.1, p)) + Math.sin(lt * 0.9 + d.d * 20) * 10, y = lerp(470, d.y, Math.min(1.1, p)) + Math.cos(lt * 1.1 + d.d * 30) * 8;
-    c.fillStyle = d.col; c.beginPath(); c.arc(x, y, d.s * clamp(p), 0, TAU); c.fill();
+  // multilingual "welcome" marquee rows (faint, appear mid-section)
+  const mq = ev(lt, 3.8, 4.6, E.lin);
+  if (mq > 0) {
+    const mf = F(800, 46), uw = metrics(WELCOMES, mf).width;
+    c.save(); c.globalAlpha = 0.13 * mq;
+    for (const [y, dir] of [[150, -1], [960, 1]]) {
+      const off = ((lt * 120 * dir) % uw + uw) % uw;
+      for (let x = -uw + off - uw; x < W + uw; x += uw) textC(c, WELCOMES, mf, x, y, K.ink, { align: 'left' });
+    }
+    c.restore();
   }
-  // 어서와 — slam, syllables bounce on the beat, then a light sweep through the letters
+  // echo outlines on the beat
+  for (const [et, col] of [[4.0, K.red], [5.0, K.blue], [6.0, K.green]]) {
+    const p = prog(lt, et, et + 0.7); if (p <= 0 || p >= 1) continue;
+    const s2 = lerp(1, 1.45, E.outExpo(p));
+    c.save(); c.translate(960, 470); c.scale(s2, s2); c.translate(-960, -470);
+    textC(c, '어서와', F(900, 400), 960, 470, null, { stroke: rgba(col, 0.7 * (1 - p)), lw: 3 / s2 });
+    c.restore();
+  }
+  // 서까래 medallions burst and float
+  for (const d of MEDS) {
+    const p = spring(lt - 0.15 - d.d, 2.4, 0.5);
+    if (p <= 0) continue;
+    const beatPulse = lt > 0.5 ? 1 + 0.12 * Math.exp(-((lt - 0.5) % 0.5) * 9) : 1;
+    const x = lerp(960, d.x, Math.min(1.08, p)) + Math.sin(lt * 0.8 + d.ph) * 12, y = lerp(470, d.y, Math.min(1.08, p)) + Math.cos(lt * 1.0 + d.ph) * 9;
+    medallion(c, x, y, d.s * beatPulse * (lt > 6.0 ? 1 + 0.3 * Math.exp(-(lt - 6.0) * 5) : 1), clamp(p), lt * 0.6 + d.ph);
+  }
+  // 어서와 + light sweep through the letters
   drawEoseowa(c, lt);
-  const sw = prog(lt, 2.6, 3.5);
+  const sw = prog(lt, 2.5, 3.3);
   if (sw > 0 && sw < 1) {
     sctx.setTransform(1, 0, 0, 1, 0, 0); sctx.clearRect(0, 0, W, H);
     drawEoseowa(sctx, lt);
@@ -513,27 +595,18 @@ function sWelcome(c, t) { // t = global
     sctx.globalCompositeOperation = 'source-over';
     c.drawImage(sweepCv, 0, 0);
   }
-  // 단청 band under the word
-  dancheongBand(c, 960 - 520, 735, 1040, 30, prog(lt, 0.7, 1.6));
+  // 단청 band: unrolls, then a shimmer runs along it
+  const bx = 960 - 520, by = 735;
+  dancheongBand(c, bx, by, 1040, 30, prog(lt, 0.6, 1.5));
+  const sh = prog(lt, 2.6, 3.4);
+  if (sh > 0 && sh < 1) { const x = lerp(bx - 80, bx + 1120, E.ioCub(sh)); c.fillStyle = 'rgba(255,255,255,0.6)'; c.fillRect(x, by, 50, 30); }
   // WELCOME TO KOREA
-  const wt = 'WELCOME TO KOREA', wf = F(600, 34), wm = metrics(wt, wf, 16);
-  charsC(c, wt, wf, 960, 830, K.ink, i => ({ dy: (1 - ev(lt, 1.1 + i * 0.025, 1.6 + i * 0.025)) * 50 }), { clip: true, ls: 16 });
-  void wm;
+  charsC(c, 'WELCOME TO KOREA', F(600, 34), 960, 830, K.ink, i => ({ dy: (1 - ev(lt, 1.0 + i * 0.025, 1.5 + i * 0.025)) * 50 }), { clip: true, ls: 16 });
   c.restore();
   // lattice border frame drawing in (accent)
-  const bp = ev(lt, 3.6, 5.4, E.ioCub);
-  if (bp > 0) {
-    c.save(); c.globalAlpha = 0.9;
-    lattice(c, 0, 0, W, 60, 60, 2, rgba(K.wood, 0.55), bp); lattice(c, 0, H - 60, W, 60, 60, 2, rgba(K.wood, 0.55), bp);
-    c.restore();
-  }
-  // doors burst open over the start
-  if (lt < 0.6) {
-    const open = ev(lt, 0, 0.55, E.outExpo);
-    doors(c, open, 0.9, eoseowaShadow(t));
-    const fl = 1 - ev(lt, 0, 0.35, E.outCub);
-    c.fillStyle = rgba(K.glow, fl * 0.9); c.fillRect(-100, -100, W + 200, H + 200);
-  }
+  const bp = ev(lt, 4.6, 6.0, E.ioCub);
+  if (bp > 0) { lattice(c, 0, 0, W, 60, 60, 2, rgba(K.wood, 0.5), bp); lattice(c, 0, H - 60, W, 60, 60, 2, rgba(K.wood, 0.5), bp); }
+  bandWipe(c, t, 22.0);
 }
 
 // =====================================================================
@@ -546,8 +619,8 @@ const SCENES = [
   { a: 20, b: 22, f: (c, t) => sBreath(c, t + 20) },
   { a: 22, b: 30.1, f: (c, t) => sWelcome(c, t + 22) },
 ];
-const IMPACTS = [[4.0, 10], [8.0, 8], [12.0, 8], [15.5, 8], [16.0, 6], [20.75, 10], [22.0, 28], [22.5, 6], [23.0, 6], [23.5, 6]];
-const CA_HITS = [[4.0, 8], [8.0, 6], [12.0, 8], [16.0, 6], [18.0, 6], [20.75, 8], [22.0, 16]];
+const IMPACTS = [[4.0, 10], [8.0, 8], [12.0, 8], [15.5, 8], [16.0, 6], [22.0, 26], [22.09, 12], [22.18, 12], [24.0, 6], [26.0, 6], [28.0, 12]];
+const CA_HITS = [[4.0, 8], [8.0, 6], [12.0, 8], [16.0, 6], [18.0, 6], [21.9, 10], [22.0, 16], [28.0, 8]];
 function shake(t) {
   let x = 0, y = 0;
   for (const [ti, a] of IMPACTS) { if (t < ti || t > ti + 0.6) continue; const d = t - ti, e = a * Math.exp(-d * 11); x += e * Math.sin(d * 71 + ti * 13); y += e * Math.cos(d * 59 + ti * 7); }
@@ -611,7 +684,7 @@ window.renderFrame = function (frame) {
   return true;
 };
 window.ready = (async () => {
-  const sample = 'Hello 어서와 こんにちは 你好 สวัสดี नमस्ते مرحبا Привет Γειά';
+  const sample = 'Hello 어서와 こんにちは 你好 สวัสดี नमस्ते مرحبا Привет Γεια ʻŌ';
   await Promise.all([900, 800, 700, 600].map(w => document.fonts.load(F(w, 100), sample)));
   // warm-up so every fallback face is resolved before frame 0
   ctx.font = F(900, 100); ctx.fillText(sample, 0, -200); ctx.font = F(800, 100); ctx.fillText(sample, 0, -200);

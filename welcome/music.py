@@ -1,34 +1,34 @@
-"""Soundtrack for 어서와 (30s, 120 BPM, A minor pentatonic), hits locked to the edit.
+"""Soundtrack for 어서와 — K-pop dance style (30s, 120 BPM, F minor), hits locked to the edit.
 
-Punchy sidechained groove + Karplus-Strong 'gayageum' plucks with 농현-style vibrato,
-a 북 hit on the drop, a breath (near silence) while the doors are closed.
+Four-on-the-floor kick, layered clap/snare, 808 sub with glide, 3-3-2 supersaw stabs,
+a bright lead hook and formant 'vocal chops' on the drop, build -> breath -> silent gap -> drop.
 usage: python music.py build/music.wav
 """
 import sys
 import wave
 
 import numpy as np
-from scipy.signal import butter, sosfilt, fftconvolve, lfilter
+from scipy.signal import butter, sosfilt, fftconvolve
 
 SR = 48000
 N = int(SR * 30.0)
-rng = np.random.default_rng(23)
+rng = np.random.default_rng(31)
 
 
 def T(s):
-    return int(s * SR)
+    return int(round(s * SR))
 
 
 def env(n, tau):
     return np.exp(-np.arange(n) / (tau * SR))
 
 
-def lp(x, f):
-    return sosfilt(butter(2, f, 'low', fs=SR, output='sos'), x)
+def lp(x, f, order=2):
+    return sosfilt(butter(order, f, 'low', fs=SR, output='sos'), x)
 
 
-def hp(x, f):
-    return sosfilt(butter(2, f, 'high', fs=SR, output='sos'), x)
+def hp(x, f, order=2):
+    return sosfilt(butter(order, f, 'high', fs=SR, output='sos'), x)
 
 
 def bp(x, lo, hi):
@@ -47,85 +47,109 @@ def note(n):
     return 440.0 * 2 ** ((n - 69) / 12)
 
 
-def saw(f, n, det=0.0):
+def adsr(n, a=0.005, r=0.05):
+    e = np.ones(n)
+    na, nr = max(1, T(a)), max(1, T(r))
+    e[:na] = np.linspace(0, 1, na)
+    e[-nr:] *= np.linspace(1, 0, nr)
+    return e
+
+
+def supersaw(f, n, voices=7, spread=0.012):
     t = np.arange(n) / SR
-    return 2 * ((t * f * (1 + det)) % 1.0) - 1
-
-
-def sine(f, n):
-    return np.sin(2 * np.pi * f * np.arange(n) / SR)
-
-
-# ---------- instruments ----------
-def gayageum(f, length=1.6, g=0.5, bend=True):
-    """Karplus-Strong pluck, then a slow vibrato (농현) applied by phase-warping."""
-    n = T(length)
-    p = int(SR / f)
-    buf = rng.uniform(-1, 1, p)
-    buf = lp(buf, min(9000, f * 14))
     out = np.zeros(n)
-    # vectorised KS: y[i] = 0.5*(y[i-p] + y[i-p-1]) * decay  (filter form)
-    a = np.zeros(p + 2)
-    a[0] = 1
-    a[p] = -0.4985
-    a[p + 1] = -0.4985
-    x = np.zeros(n)
-    x[:p] = buf
-    out = lfilter([1.0], a, x)
-    if bend:
-        t = np.arange(n) / SR
-        vib = np.where(t > 0.25, 0.006 * np.sin(2 * np.pi * 5.2 * (t - 0.25)) * np.minimum(1, (t - 0.25) * 2), 0)
-        idx = np.cumsum(1 + vib)
-        idx = np.clip(idx, 0, n - 1)
-        out = np.interp(idx, np.arange(n), out)
-    out *= np.minimum(1, (n - np.arange(n)) / (0.05 * SR))
-    return out / (np.max(np.abs(out)) + 1e-9) * g
+    for v in range(voices):
+        d = (v - (voices - 1) / 2) / ((voices - 1) / 2) * spread
+        out += 2 * ((t * f * (1 + d) + rng.random()) % 1.0) - 1
+    return out / voices
 
 
-def kick(big=False):
-    n = T(0.45 if big else 0.38)
+def sine_glide(f0, f1, n, glide=0.06):
     t = np.arange(n) / SR
-    f = 46 + 130 * np.exp(-t / 0.028)
-    s = np.sin(2 * np.pi * np.cumsum(f) / SR) * env(n, 0.15 if big else 0.11)
-    return np.tanh(1.9 * (s + hp(rng.standard_normal(n), 3500) * env(n, 0.003) * 0.35))
+    f = f1 + (f0 - f1) * np.exp(-t / glide)
+    return np.sin(2 * np.pi * np.cumsum(f) / SR)
 
 
-def clap():
-    n = T(0.3)
-    nz = bp(rng.standard_normal(n), 1000, 5200)
-    e = np.zeros(n)
-    for k, d in enumerate([0, 0.009, 0.019]):
+# ---------- drums ----------
+def kick():
+    n = T(0.36)
+    t = np.arange(n) / SR
+    f = 50 + 140 * np.exp(-t / 0.025)
+    s = np.sin(2 * np.pi * np.cumsum(f) / SR) * env(n, 0.12)
+    click = hp(rng.standard_normal(n), 4000) * env(n, 0.002) * 0.5
+    return np.tanh(2.2 * (s + click))
+
+
+def snare():
+    n = T(0.32)
+    t = np.arange(n) / SR
+    tone = np.sin(2 * np.pi * np.cumsum(190 + 60 * np.exp(-t / 0.02)) / SR) * env(n, 0.05)
+    nz = bp(rng.standard_normal(n), 1500, 9000) * env(n, 0.09)
+    clp = np.zeros(n)
+    for k, d in enumerate([0, 0.008, 0.016]):
         i = T(d)
-        e[i:] += env(n - i, 0.006 if k < 2 else 0.085)
-    return nz * e * 0.8
+        clp[i:] += bp(rng.standard_normal(n - i), 1000, 4500) * env(n - i, 0.005 if k < 2 else 0.07)
+    return np.tanh(1.5 * (0.6 * tone + 0.6 * nz + 0.7 * clp))
 
 
-def hat(open_=False):
-    n = T(0.22 if open_ else 0.045)
-    return hp(rng.standard_normal(n), 8000) * env(n, 0.06 if open_ else 0.011) * 0.3
+def hat(open_=False, g=0.3):
+    n = T(0.2 if open_ else 0.04)
+    return hp(rng.standard_normal(n), 9000) * env(n, 0.05 if open_ else 0.01) * g
 
 
-def buk():
-    n = T(1.4)
+def tom(f=120):
+    n = T(0.3)
     t = np.arange(n) / SR
-    body = np.sin(2 * np.pi * np.cumsum(52 + 45 * np.exp(-t / 0.06)) / SR) * env(n, 0.45)
-    skin = lp(rng.standard_normal(n), 900) * env(n, 0.05) * 0.6
-    slap = hp(rng.standard_normal(n), 2500) * env(n, 0.004) * 0.4
-    return np.tanh(1.6 * (body + skin + slap))
+    return np.sin(2 * np.pi * np.cumsum(f + 80 * np.exp(-t / 0.04)) / SR) * env(n, 0.12)
 
 
-def pop(f=900, g=0.25):
-    n = T(0.12)
-    fr = f * np.exp(-np.arange(n) / (0.03 * SR)) + f * 0.4
-    return np.sin(2 * np.pi * np.cumsum(fr) / SR) * env(n, 0.03) * g
+# ---------- synths ----------
+def stab(chord, length=0.16, cutoff=5000, g=0.32):
+    n = T(length)
+    s = sum(supersaw(note(m), n) for m in chord) / len(chord)
+    s = s + 0.5 * sum(supersaw(note(m + 12), n, 5, 0.008) for m in chord[:1])
+    return lp(s, cutoff) * adsr(n, 0.003, 0.06) * env(n, length * 1.2) * g
 
 
-def tick(f=2600, g=0.12):
-    n = T(0.03)
-    return sine(f, n) * env(n, 0.006) * g
+def pad(chord, length, cutoff, g=0.1):
+    n = T(length)
+    s = sum(supersaw(note(m), n, 5, 0.01) for m in chord) / len(chord)
+    return lp(s, cutoff) * adsr(n, 0.25, 0.3) * g
 
 
-def whoosh(length=0.55, up=True):
+def lead(m, length, prev=None, g=0.22):
+    n = T(length)
+    f1 = note(m)
+    f0 = note(prev) if prev is not None else f1
+    t = np.arange(n) / SR
+    f = f1 + (f0 - f1) * np.exp(-t / 0.035)
+    ph = np.cumsum(f) / SR
+    sq = np.sign(np.sin(2 * np.pi * ph)) * 0.5 + (2 * ((ph * 1.005) % 1) - 1) * 0.5
+    vib = 1 + 0.004 * np.sin(2 * np.pi * 5.5 * t) * np.minimum(1, t * 3)
+    sq2 = 2 * ((np.cumsum(f * vib * 2) / SR) % 1) - 1          # octave up layer
+    s = lp(sq + 0.35 * sq2, 6500)
+    return s * adsr(n, 0.004, 0.04) * g
+
+
+def vchop(m, length=0.18, vowel='a', g=0.3):
+    """Formant 'vocal chop' (ah / ey) — a sung-syllable-like synth."""
+    n = T(length)
+    f = note(m)
+    t = np.arange(n) / SR
+    src = 2 * ((t * f) % 1.0) - 1 + 0.15 * rng.standard_normal(n)
+    F = {'a': [(750, 1.0), (1200, 0.6), (2600, 0.3)], 'e': [(500, 1.0), (1850, 0.7), (2600, 0.3)]}[vowel]
+    s = sum(bp(src, fc * 0.88, fc * 1.12) * a for fc, a in F)
+    return s * adsr(n, 0.01, 0.06) * g * 3
+
+
+def sub808(m, length, prev=None, g=0.6):
+    n = T(length)
+    f1 = note(m)
+    s = sine_glide(note(prev) if prev is not None else f1, f1, n, 0.05)
+    return np.tanh(1.8 * s) * adsr(n, 0.003, 0.05) * g
+
+
+def whoosh(length=0.5, up=True):
     n = T(length)
     nz = rng.standard_normal(n)
     o = np.zeros(n)
@@ -135,115 +159,164 @@ def whoosh(length=0.55, up=True):
         p = c / (ch - 1)
         fc = 300 * (20 ** (p if up else 1 - p))
         o[a:b] = bp(nz[max(0, a - 2000):b], fc * 0.6, min(fc * 1.6, 20000))[-(b - a):]
-    return o * np.sin(np.linspace(0, np.pi, n)) ** 2 * 0.8
+    return o * np.sin(np.linspace(0, np.pi, n)) ** 2 * 0.7
 
 
-def wood_thunk():
-    n = T(0.5)
+def impact(g=1.0):
+    n = T(1.8)
     t = np.arange(n) / SR
-    s = np.sin(2 * np.pi * np.cumsum(140 * np.exp(-t / 0.05) + 70) / SR) * env(n, 0.12)
-    return s + bp(rng.standard_normal(n), 300, 1800) * env(n, 0.02) * 0.6
+    boom = np.sin(2 * np.pi * np.cumsum(34 + 70 * np.exp(-t / 0.08)) / SR) * env(n, 0.5)
+    crash = lp(hp(rng.standard_normal(n), 600), 11000) * env(n, 0.4) * 0.35
+    return np.tanh(1.4 * (boom + crash)) * g
 
 
-def riser(a, b):
-    n = T(b - a)
-    p = np.arange(n) / n
-    tone = np.sin(2 * np.pi * np.cumsum(140 * 2 ** (p * 3)) / SR)
-    return (tone * 0.22 + hp(rng.standard_normal(n), 1500) * 0.5 * p ** 2) * p ** 1.6
-
-
-def rev_cymbal(length=1.0):
+def riser(length):
     n = T(length)
-    s = hp(rng.standard_normal(n), 5000) * env(n, 0.35)
-    return s[::-1] * 0.5
+    p = np.arange(n) / n
+    nz = rng.standard_normal(n)
+    o = np.zeros(n)
+    ch = 32
+    for c in range(ch):
+        a, b = c * n // ch, (c + 1) * n // ch
+        fc = 400 * (24 ** (c / (ch - 1)))
+        o[a:b] = bp(nz[max(0, a - 2000):b], fc * 0.7, min(fc * 1.4, 20000))[-(b - a):]
+    pitch = np.sin(2 * np.pi * np.cumsum(220 * 2 ** (p * 2)) / SR) * 0.15
+    return (o * 0.6 + pitch) * p ** 2
+
+
+def rev_cymbal(length=0.9):
+    n = T(length)
+    return (hp(rng.standard_normal(n), 5000) * env(n, 0.3))[::-1] * 0.5
+
+
+def tick(f=3000, g=0.1):
+    n = T(0.025)
+    return np.sin(2 * np.pi * f * np.arange(n) / SR) * env(n, 0.005) * g
 
 
 # ---------- arrangement ----------
-drums, bass, pads, keys, fx = (np.zeros(N) for _ in range(5))
-PROG = [(45, [57, 60, 64]), (41, [57, 60, 65]), (48, [55, 60, 64]), (43, [55, 59, 62])]  # Am F C G
-PENTA = [57, 60, 62, 64, 67, 69, 72, 74, 76, 79, 81]                                  # A C D E G ...
+drums, bass, synth, leadb, vox, fx = (np.zeros(N) for _ in range(6))
+# F minor: Fm Db Ab Eb (bars of 2s)
+PROG = [(41, [65, 68, 72]), (37, [61, 65, 68]), (44, [60, 63, 68]), (39, [58, 63, 67])]
+STABS = [0, 3, 6, 10, 12]                                       # 3-3-2 feel in 16ths
 
-# intro: night ambience + slow gayageum phrase
-amb = lp(rng.standard_normal(T(4.2)), 500) * 0.05
-add(fx, amb * np.minimum(1, np.arange(len(amb)) / (0.8 * SR)), 0)
-for t_, m in [(0.2, 69), (0.95, 72), (1.45, 76), (1.6, 74), (2.4, 72), (2.9, 69), (3.3, 67)]:
-    add(keys, gayageum(note(m), 1.8, 0.4), t_)
-add(fx, whoosh(0.6), 3.4, 0.45)
+def chord_at(t):
+    return PROG[int(t // 2) % 4]
 
-beat = lambda a, b: [x * 0.5 for x in range(int(a * 2), int(b * 2))]
-kicks = beat(4, 20) + beat(22, 29)
+# intro (0-4): filtered pad swelling, vocal "ooh" chops, riser into 4
+for bar in range(2):
+    add(synth, pad(PROG[bar][1], 2.1, 700 + bar * 900, 0.16), bar * 2.0)
+for t_, m in [(0.5, 72), (1.5, 75), (2.5, 77), (3.25, 80)]:
+    add(vox, vchop(m, 0.5, 'a', 0.14), t_)
+add(fx, riser(1.6), 2.4, 0.5)
+add(fx, whoosh(0.5), 3.6, 0.5)
+
+kicks = [x * 0.5 for x in range(8, 38)] + [x * 0.5 for x in range(44, 58)]   # 4-19, 22-29
 for k in kicks:
-    add(drums, kick(big=(k == 22.0)), k, 0.95)
-for b in beat(4, 20) + beat(22, 29):
-    if int(b * 2) % 2 == 1:
-        add(drums, clap(), b, 0.55)
-for b in beat(4, 12):
-    add(drums, hat(int(b * 2) % 4 == 3), b + 0.25, 0.55)
-for s in range(int(12 * 8), int(18 * 8)):
-    add(drums, hat(), s * 0.125, 0.4 if s % 2 else 0.18)
-for s in range(int(22 * 8), int(29 * 8)):
-    add(drums, hat(), s * 0.125, 0.42 if s % 2 else 0.2)
-r = 18.0                                                     # roll into the breath
+    add(drums, kick(), k, 0.8)
+for x in range(8, 38):                                          # snare on 2 & 4
+    if x % 2 == 1:
+        add(drums, snare(), x * 0.5, 0.6)
+for x in range(45, 58, 2):
+    add(drums, snare(), x * 0.5, 0.65)
+for x in range(8, 24):
+    add(drums, hat(x % 2 == 1, 0.35), x * 0.5 + 0.25)
+for s in range(96, 152):                                        # 12-19: 16th hats
+    add(drums, hat(False, 0.35 if s % 2 else 0.18), s * 0.125)
+for s in range(176, 232):                                       # drop 16ths
+    add(drums, hat(s % 4 == 2, 0.34 if s % 2 else 0.2), s * 0.125)
+r = 18.0                                                        # snare roll into the breath
 while r < 20.0:
     p = (r - 18) / 2
-    add(drums, clap(), r, 0.12 + 0.4 * p)
+    add(drums, snare(), r, 0.15 + 0.4 * p)
     r += 0.25 if p < 0.5 else 0.125 if p < 0.8 else 0.0625
+for i, t_ in enumerate([21.5, 21.625]):                         # tom pickup before the gap
+    add(drums, tom(140 - i * 30), t_, 0.5)
 
 duck = np.ones(N)
 for k in kicks:
-    i, n = T(k), T(0.32)
+    i, n = T(k), T(0.3)
     j = min(N, i + n)
-    duck[i:j] = np.minimum(duck[i:j], 1 - 0.8 * np.exp(-np.arange(j - i) / (0.08 * SR)))
+    duck[i:j] = np.minimum(duck[i:j], 1 - 0.85 * np.exp(-np.arange(j - i) / (0.075 * SR)))
 
+# bass: 808 sub following roots (offbeat-ish pattern), mid bass doubles in the drop
+prev = None
 for bar in range(15):
     t0 = bar * 2.0
     root, chord = PROG[bar % 4]
-    if 4.0 <= t0 < 20.0 or 22.0 <= t0 < 29.0:
-        for e in range(8):                                   # bass offbeat-heavy pattern
-            n = T(0.2)
-            f = note(root - 12 + (12 if e in (3, 7) else 0))
-            add(bass, lp(saw(f, n) + 0.8 * sine(f, n), 900) * env(n, 0.13), t0 + e * 0.25, 0.5)
-    n = T(2.2)
-    s = sum(saw(note(m), n, d) for m in chord for d in (-0.004, 0, 0.005))
-    a = np.minimum(1, np.arange(n) / (0.25 * SR)) * np.minimum(1, (n - np.arange(n)) / (0.3 * SR))
-    g = 0.03 if t0 < 4 else 0.012 if 20.0 <= t0 < 22.0 else 0.045
-    add(pads, lp(s, 1500 if t0 >= 22 else 1000) * a, t0, g)
+    if not (4.0 <= t0 < 20.0 or 22.0 <= t0 < 30.0):
+        continue
+    for st, ln, oct_ in [(0, 0.6, 0), (6, 0.35, 0), (10, 0.3, 12), (12, 0.6, 0)]:
+        m = root - 12 + oct_
+        add(bass, sub808(m, ln, prev), t0 + st * 0.125, 0.55)
+        prev = m
+# chords: 3-3-2 supersaw stabs (sustained pad in the first verse)
+for bar in range(15):
+    t0 = bar * 2.0
+    root, chord = PROG[bar % 4]
+    if 4.0 <= t0 < 12.0:
+        add(synth, pad(chord, 2.05, 2400, 0.22), t0)
+        for st in STABS:
+            add(synth, stab(chord, 0.14, 3400, 0.3), t0 + st * 0.125)
+    elif 12.0 <= t0 < 20.0:
+        for st in STABS + [14]:
+            add(synth, stab(chord, 0.15, 3600 + (t0 - 12) * 400, 0.34), t0 + st * 0.125)
+    elif 20.0 <= t0 < 22.0:
+        add(synth, pad(chord, 2.0, 500, 0.12), t0)          # breath: muffled pad
+    elif t0 >= 22.0:
+        for st in STABS + [14]:
+            add(synth, stab(chord, 0.16, 6000, 0.26), t0 + st * 0.125)
 
-# greeting cuts: pop + gayageum note on every cut
+# drop hook (22-29)
+HOOK = [(0, 77, 2), (2, 80, 2), (4, 77, 1), (5, 75, 1), (6, 72, 2), (10, 75, 2), (12, 77, 4),
+        (16, 80, 2), (18, 82, 2), (20, 80, 1), (21, 77, 1), (22, 75, 2), (26, 72, 2), (28, 77, 4)]
+pv = None
+for rep, base in enumerate([22.0, 26.0]):
+    for st, m, ln in HOOK:
+        t_ = base + st * 0.125
+        if t_ >= 29.4:
+            continue
+        add(leadb, lead(m, ln * 0.125 + 0.05, pv), t_)
+        pv = m
+for t_ in [22.75, 23.75, 24.75, 25.75, 26.75, 27.75]:            # "ey" chops on offbeats
+    add(vox, vchop(chord_at(t_)[1][2] + 12, 0.16, 'e', 0.22), t_)
+add(vox, vchop(84, 0.35, 'e', 0.35), 22.0)                       # 'HEY' on the drop
+add(vox, vchop(72, 0.35, 'a', 0.3), 21.0)                        # breath cue
+
+# picture-locked fx
 cuts = [4 + i for i in range(8)] + [12 + 0.5 * i for i in range(12)]
-for i, t_ in enumerate(cuts):
-    add(fx, pop(700 + (i % 5) * 120), t_, 1.0)
-    add(keys, gayageum(note(PENTA[(i * 3) % 7 + 2]), 0.9, 0.3), t_)
-for i in range(16):                                          # wall: rapid ticks
-    add(fx, tick(2000 + i * 90, 0.14), 18.0 + i * 0.125)
-add(fx, riser(18.3, 20.0), 18.3, 0.7)
-add(fx, whoosh(0.7, False), 20.0, 0.5)                       # greetings sucked in
-add(fx, wood_thunk(), 20.75, 0.9)                            # doors shut
-add(fx, sine(55, T(1.2)) * np.linspace(0, 1, T(1.2)) ** 2 * 0.25, 20.8)   # sub swell (breath)
-add(fx, rev_cymbal(1.1), 20.9, 0.8)
-add(fx, buk(), 22.0, 1.0)                                    # DROP
-add(fx, whoosh(0.5), 21.85, 0.5)
-# drop melody on gayageum
-mel = [(22.5, 76), (22.75, 74), (23.0, 72), (23.5, 69), (24.0, 72), (24.5, 74), (25.0, 76), (25.5, 79),
-       (26.0, 81), (26.5, 79), (27.0, 76), (27.5, 74), (28.0, 72), (28.5, 69)]
-for t_, m in mel:
-    add(keys, gayageum(note(m), 1.2, 0.38), t_)
-add(keys, gayageum(note(69), 2.5, 0.45), 29.0)
-add(keys, gayageum(note(57), 2.5, 0.35), 29.0)
+for t_ in cuts:
+    add(fx, whoosh(0.18), t_ - 0.12, 0.25)
+for i in range(16):
+    add(fx, tick(2400 + i * 120, 0.12), 18.0 + i * 0.125)
+add(fx, riser(2.0), 18.0, 0.7)
+add(fx, whoosh(0.8, False), 20.0, 0.45)
+add(fx, rev_cymbal(0.85), 20.9, 0.7)
+add(fx, impact(1.0), 22.0)
+add(fx, impact(0.5), 28.0)
+for t_ in [12.0, 16.0]:
+    add(fx, whoosh(0.4), t_ - 0.2, 0.4)
+
+# silent pre-drop gap: 21.78-22.0 everything but the reverse cymbal tail drops out
+gap = np.ones(N)
+a_, b_ = T(21.78), T(22.0)
+gap[a_:b_] = 0.0
+gap[a_ - T(0.02):a_] = np.linspace(1, 0, T(0.02))
 
 # ---------- mix ----------
-ir_n = T(1.6)
-ir = lp(rng.standard_normal(ir_n) * env(ir_n, 0.35), 7000)
+ir_n = T(1.4)
+ir = lp(rng.standard_normal(ir_n) * env(ir_n, 0.28), 8000)
 ir /= np.sqrt(np.sum(ir ** 2))
-wet = fftconvolve(pads * duck + keys + 0.4 * fx + 0.2 * drums, ir)[:N] * 0.3
-mix = drums + bass * duck + pads * duck + keys * (0.55 + 0.45 * duck) + fx + wet
-mix = hp(mix, 25)
-mix = np.tanh(mix * 1.4) / np.tanh(1.4)
-mix *= 0.89 / np.max(np.abs(mix))
-mix[T(29.2):] *= np.linspace(1, 0, N - T(29.2)) ** 2
+music = drums + 0.75 * bass * duck + 2.2 * synth * (0.35 + 0.65 * duck) + 1.3 * leadb * (0.6 + 0.4 * duck) + 1.4 * vox
+wet = fftconvolve(synth * duck * 0.5 + leadb * 0.6 + vox + 0.15 * drums, ir)[:N] * 0.28
+mix = (music + wet) * gap + fx
+mix = hp(mix, 28)
+mix = np.tanh(mix * 1.5) / np.tanh(1.5)
+mix *= 0.9 / np.max(np.abs(mix))
+mix[T(29.25):] *= np.linspace(1, 0, N - T(29.25)) ** 2
 right = mix.copy()
-d = T(0.011)
-right[d:] = 0.85 * mix[d:] + 0.15 * mix[:-d]
+d = T(0.012)
+right[d:] = 0.82 * mix[d:] + 0.18 * mix[:-d]
 pcm = (np.clip(np.stack([mix, right], 1), -1, 1) * 32767).astype('<i2')
 with wave.open(sys.argv[1] if len(sys.argv) > 1 else 'music.wav', 'wb') as w:
     w.setnchannels(2)
