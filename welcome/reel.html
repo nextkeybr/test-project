@@ -134,7 +134,7 @@ function aMotif(c, x, y, s) { // 亞 outline inside a cell, plus spokes to the c
   c.moveTo(x, y + s / 2); c.lineTo(L, y + s / 2); c.moveTo(R, y + s / 2); c.lineTo(x + s, y + s / 2);
 }
 // draws a lattice over rect; p = draw-on progress (cells appear by diagonal order)
-function lattice(c, x, y, w, h, s, lw, col, p = 1) {
+function lattice(c, x, y, w, h, s, lw, col, p = 1, aja = false) {
   const cols = Math.ceil(w / s), rows = Math.ceil(h / s);
   c.save(); c.beginPath(); c.rect(x, y, w, h); c.clip();
   c.strokeStyle = col; c.lineWidth = lw; c.lineJoin = 'miter';
@@ -145,6 +145,7 @@ function lattice(c, x, y, w, h, s, lw, col, p = 1) {
     c.setLineDash([per * q, per]); c.beginPath(); aMotif(c, x + i * s, y + j * s, s); c.stroke();
   }
   c.setLineDash([]);
+  if (aja) { c.restore(); return; }
   c.beginPath(); for (let i = 0; i <= cols; i++) { c.moveTo(x + i * s, y); c.lineTo(x + i * s, y + h * clamp(p * 1.4)); }
   for (let j = 0; j <= rows; j++) { c.moveTo(x, y + j * s); c.lineTo(x + w * clamp(p * 1.4), y + j * s); } c.stroke();
   c.restore();
@@ -326,7 +327,7 @@ function drawGreeting(c, g, lt, n) {
 // =====================================================================
 //  SCENE 0 — INTRO (0 → 4s): night, glowing 한지 screen, shadow "Hello"
 // =====================================================================
-const SCR = { x: 960 - 470, y: 540 - 300, w: 940, h: 560, cell: 94 };
+const SCR = { x: 960 - 470, y: 540 - 300, w: 940, h: 560, cell: 117.5 };
 function hanjiScreen(c, t, light, opts = {}) {
   const { x, y, w, h, cell } = SCR;
   // warm glow spill
@@ -340,7 +341,7 @@ function hanjiScreen(c, t, light, opts = {}) {
   c.save(); c.globalAlpha = 0.5 * light; c.drawImage(hanjiTex, x, y, w, h, x, y, w, h); c.restore();
   if (opts.shadow) opts.shadow(c);
   // lattice + frame
-  lattice(c, x, y, w, h, cell, 5, K.wood, opts.latP ?? 1);
+  lattice(c, x, y, w, h, cell, 4.5, K.wood, opts.latP ?? 1, true);
   c.strokeStyle = K.wood; c.lineWidth = 22; c.strokeRect(x - 11, y - 11, w + 22, h + 22);
   c.fillStyle = K.wood; c.fillRect(959 - 7, y, 14, h);
 }
