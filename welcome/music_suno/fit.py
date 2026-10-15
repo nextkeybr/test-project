@@ -1,8 +1,8 @@
 """Fit a supplied track (Suno, 124.94 BPM) to the 어서와 edit (120 BPM, drop at 22.0s).
 
 1. time-stretch to 120 BPM with rubberband (pitch preserved) — 1 bar = exactly 2.0s
-2. splice bars so: video 0-4 intro pads, 4-20 verse (last bar = pre-break), 20-22 last break bar,
-   22-30 first drop; 12 ms equal-power crossfades on every splice, fade-out at the end.
+2. one phrase-aligned splice: video 0-6 intro, 6-30 phrase B + break + drop uncut (drop at 22.0s);
+   40 ms equal-power crossfade on the splice, fade-out at the end.
 usage: python fit.py in.wav out.wav
 """
 import subprocess
@@ -34,11 +34,10 @@ def seg(bar_from, bar_to):
 
 
 # (source bars relative to drop) -> placed back to back from t=0
-plan = [(-18, -16),   # video 0-4   : intro pads
-        (-11, -3),    # video 4-20  : verse, ends on the strongest pre-break bar
-        (-1, 0),      # video 20-22 : last (quiet) bar of the break
-        (0, 4.2)]     # video 22-30 : drop
-X = 12 * SR // 1000
+# one splice only, phrase boundary to phrase boundary (8-bar phrases start at D-16, D-8, D):
+plan = [(-19, -16),   # video 0-6   : last 3 intro bars (ends exactly where the song's beat would enter)
+        (-8, 4.2)]    # video 6-30  : phrase B (pre-chorus + break) straight into the drop, uncut
+X = 40 * SR // 1000
 out = np.zeros((0, 2), np.float32)
 for a, b in plan:
     s = seg(a, b).copy()

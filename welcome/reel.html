@@ -10,6 +10,7 @@
 </head>
 <body>
 <canvas id="out" width="1920" height="1080"></canvas>
+<script src="audio_events.js"></script>
 <script>
 // =====================================================================
 //  어서와 — world greetings typography, 30s @ 60fps, 1920x1080
@@ -49,6 +50,17 @@ function spring(t, f = 2.2, z = 0.38) {
   const w = TAU * f, wd = w * Math.sqrt(1 - z * z);
   return 1 - Math.exp(-z * w * t) * (Math.cos(wd * t) + (z * w / wd) * Math.sin(wd * t));
 }
+// ---------- audio-reactive helpers (events extracted from the soundtrack) ----------
+let NOW = 0;
+const AEV = (typeof AUDIO !== 'undefined') ? AUDIO : { kick: [], snare: [], hat: [], rms: [] };
+function aenv(arr, t, decay = 12, win = 0.6) {
+  let v = 0;
+  for (let i = 0; i < arr.length; i++) { const ti = arr[i][0]; if (ti > t) break; const d = t - ti; if (d < win) v += arr[i][1] * Math.exp(-d * decay); }
+  return Math.min(1.4, v);
+}
+const KICK = (t = NOW) => aenv(AEV.kick, t, 13);
+const SNARE = (t = NOW) => aenv(AEV.snare, t, 15);
+const HAT = (t = NOW) => aenv(AEV.hat, t, 26, 0.25);
 function rng(seed) {
   let a = seed >>> 0;
   return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a);
@@ -164,26 +176,22 @@ function dancheongBand(c, x, y, w, h, p = 1) {
 //  GREETINGS
 // =====================================================================
 const G = [
-  { t: 4.0, d: 1, w: 'Hola', lang: 'ESPAÑOL', bg: K.red, fg: K.white, fx: 'drop' },
-  { t: 5.0, d: 1, w: 'Bonjour', lang: 'FRANÇAIS', bg: K.hanji, fg: K.ink, fx: 'rise', ac: K.blue, paper: 1 },
-  { t: 6.0, d: 1, w: 'Ciao', lang: 'ITALIANO', bg: K.blue, fg: K.yellow, fx: 'stack' },
-  { t: 7.0, d: 1, w: 'こんにちは', lang: '日本語', bg: K.hanji, fg: K.ink, fx: 'vertical', ac: K.red, paper: 1 },
-  { t: 8.0, d: 1, w: 'Olá', lang: 'PORTUGUÊS', bg: K.green, fg: K.white, fx: 'zoom' },
-  { t: 9.0, d: 1, w: 'Привет', lang: 'РУССКИЙ', bg: K.ink, fg: K.white, fx: 'flip' },
-  { t: 10.0, d: 1, w: '你好', lang: '中文', bg: K.yellow, fg: K.ink, fx: 'circle' },
-  { t: 11.0, d: 1, w: 'Merhaba', lang: 'TÜRKÇE', bg: K.hanji, fg: K.ink, fx: 'type', ac: K.red, paper: 1 },
-  { t: 12.0, d: .5, w: 'Hallo', lang: 'DEUTSCH', bg: K.ink, fg: K.white, fx: 'slice' },
-  { t: 12.5, d: .5, w: 'Xin chào', lang: 'TIẾNG VIỆT', bg: K.red, fg: K.white, fx: 'track' },
-  { t: 13.0, d: .5, w: 'สวัสดี', lang: 'ภาษาไทย', bg: K.hanji, fg: K.green, fx: 'whole', paper: 1 },
-  { t: 13.5, d: .5, w: 'नमस्ते', lang: 'हिन्दी', bg: K.yellow, fg: K.ink, fx: 'matra' },
-  { t: 14.0, d: .5, w: 'مرحبا', lang: 'العربية', bg: K.green, fg: K.white, fx: 'rtl' },
-  { t: 14.5, d: .5, w: 'Γεια σου', lang: 'ΕΛΛΗΝΙΚΑ', bg: K.blue, fg: K.white, fx: 'rise' },
-  { t: 15.0, d: .5, w: 'Aloha', lang: 'ʻŌLELO HAWAIʻI', bg: K.hanji, fg: K.red, fx: 'wave', paper: 1 },
-  { t: 15.5, d: .5, w: 'Jambo', lang: 'KISWAHILI', bg: K.ink, fg: K.yellow, fx: 'drop', multi: 1 },
-  { t: 16.0, d: .5, w: 'Hej', lang: 'SVENSKA', bg: K.red, fg: K.white, fx: 'pop' },
-  { t: 16.5, d: .5, w: 'Kia ora', lang: 'TE REO MĀORI', bg: K.hanji, fg: K.blue, fx: 'split', paper: 1 },
-  { t: 17.0, d: .5, w: 'Sawubona', lang: 'ISIZULU', bg: K.green, fg: K.yellow, fx: 'track' },
-  { t: 17.5, d: .5, w: 'Halo', lang: 'BAHASA INDONESIA', bg: K.blue, fg: K.white, fx: 'zoom' },
+  { t: 6.0, d: 1, w: 'Hola', lang: 'ESPAÑOL', bg: K.red, fg: K.white, fx: 'drop' },
+  { t: 7.0, d: 1, w: 'Bonjour', lang: 'FRANÇAIS', bg: K.hanji, fg: K.ink, fx: 'rise', ac: K.blue, paper: 1 },
+  { t: 8.0, d: .5, w: 'Ciao', lang: 'ITALIANO', bg: K.blue, fg: K.yellow, fx: 'stack' },
+  { t: 8.5, d: .5, w: 'こんにちは', lang: '日本語', bg: K.hanji, fg: K.ink, fx: 'vertical', ac: K.red, paper: 1 },
+  { t: 9.0, d: .5, w: 'Olá', lang: 'PORTUGUÊS', bg: K.green, fg: K.white, fx: 'zoom' },
+  { t: 9.5, d: .5, w: 'Привет', lang: 'РУССКИЙ', bg: K.ink, fg: K.white, fx: 'flip' },
+  { t: 10.0, d: .5, w: '你好', lang: '中文', bg: K.yellow, fg: K.ink, fx: 'circle' },
+  { t: 10.5, d: .5, w: 'Merhaba', lang: 'TÜRKÇE', bg: K.hanji, fg: K.ink, fx: 'type', ac: K.red, paper: 1 },
+  { t: 11.0, d: .5, w: 'Hallo', lang: 'DEUTSCH', bg: K.ink, fg: K.white, fx: 'slice' },
+  { t: 11.5, d: .5, w: 'Xin chào', lang: 'TIẾNG VIỆT', bg: K.red, fg: K.white, fx: 'track' },
+  { t: 12.0, d: .5, w: 'สวัสดี', lang: 'ภาษาไทย', bg: K.hanji, fg: K.green, fx: 'whole', paper: 1 },
+  { t: 12.5, d: .5, w: 'नमस्ते', lang: 'हिन्दी', bg: K.yellow, fg: K.ink, fx: 'matra' },
+  { t: 13.0, d: .5, w: 'مرحبا', lang: 'العربية', bg: K.green, fg: K.white, fx: 'rtl' },
+  { t: 13.5, d: .5, w: 'Γεια σου', lang: 'ΕΛΛΗΝΙΚΑ', bg: K.blue, fg: K.white, fx: 'rise' },
+  { t: 14.0, d: .5, w: 'Jambo', lang: 'KISWAHILI', bg: K.ink, fg: K.yellow, fx: 'pop', multi: 1 },
+  { t: 14.5, d: .5, w: 'Halo', lang: 'BAHASA INDONESIA', bg: K.red, fg: K.white, fx: 'zoom' },
 ];
 const OBANG = [K.blue, K.red, K.yellow, K.white, K.green];
 
@@ -204,8 +212,9 @@ function drawGreeting(c, g, lt, n) {
   const dur = g.d, cx = 960, cy = 500;
   const big = g.d === 1 ? 330 : 300;
   const font = F(900, big);
-  const punch = lerp(1.1, 1, E.outExpo(clamp(lt / 0.25)));
-  c.save(); c.translate(cx, cy); c.scale(punch, punch); c.translate(-cx, -cy);
+  const kb = Math.min(1, KICK()), sn = Math.min(1, SNARE());
+  const punch = lerp(1.1, 1, E.outExpo(clamp(lt / 0.25))) * (1 + 0.05 * kb);
+  c.save(); c.translate(cx, cy); c.rotate(0.012 * sn * Math.sin(NOW * 37)); c.scale(punch, punch); c.translate(-cx, -cy);
   switch (g.fx) {
     case 'drop': {
       const cols = g.multi ? [K.yellow, K.red, K.white, K.blue, K.green] : null;
@@ -304,12 +313,13 @@ function drawGreeting(c, g, lt, n) {
     }
     case 'wave': charsC(c, g.w, font, cx, cy, g.fg, i => ({ dy: Math.sin(lt * 14 - i * 0.9) * 40 * (1 - clamp(lt / dur)) + (1 - ev(lt, i * 0.03, i * 0.03 + 0.3)) * 300 }), { clip: true }); break;
     case 'pop': {
-      const s = spring(lt, 3.2, 0.35);
+      const s = spring(lt, 3.2, 0.35) * (1 + 0.06 * Math.min(1, KICK()));
       for (let k = 0; k < 3; k++) {
         const p = prog(lt, k * 0.05, k * 0.05 + 0.45); if (p <= 0 || p >= 1) continue;
         c.strokeStyle = rgba(K.white, 1 - p); c.lineWidth = 10 * (1 - p) + 1; c.beginPath(); c.arc(cx, cy, 150 + 600 * E.outExpo(p), 0, TAU); c.stroke();
       }
-      c.save(); c.translate(cx, cy); c.scale(s, s); c.translate(-cx, -cy); textC(c, g.w, F(900, 380), cx, cy, g.fg); c.restore();
+      c.save(); c.translate(cx, cy); c.scale(s, s); c.translate(-cx, -cy); if (g.multi) charsC(c, g.w, F(900, 380), cx, cy, g.fg, i => ({ col: [K.yellow, K.red, K.white, K.blue, K.green][i % 5], dy: -Math.sin(clamp((lt - i * 0.04) / 0.3) * Math.PI) * 30 }));
+      else textC(c, g.w, F(900, 380), cx, cy, g.fg); c.restore();
       break;
     }
     case 'split': {
@@ -321,96 +331,145 @@ function drawGreeting(c, g, lt, n) {
     }
   }
   c.restore();
+  // snare flash (adds sparkle on the backbeat)
+  if (sn > 0.02) { c.save(); c.globalCompositeOperation = g.paper || g.bg === K.yellow ? 'multiply' : 'lighter';
+    c.fillStyle = g.paper || g.bg === K.yellow ? `rgba(230,210,180,${0.18 * sn})` : `rgba(255,240,220,${0.07 * sn})`; c.fillRect(-100, -100, W + 200, H + 200); c.restore(); }
   langLabel(c, g, lt, n);
 }
 
 // =====================================================================
-//  SCENE 0 — INTRO (0 → 4s): night, glowing 한지 screen, shadow "Hello"
+//  SCENE 0 — INTRO (0 → 6s): night, two 한지 doors with 아자살 lattice,
+//  "Hello" forms as a shadow, the doors slide open and it is revealed
 // =====================================================================
-const SCR = { x: 960 - 470, y: 540 - 300, w: 940, h: 560, cell: 117.5 };
-function hanjiScreen(c, t, light, opts = {}) {
-  const { x, y, w, h, cell } = SCR;
-  // warm glow spill
-  const sp = c.createRadialGradient(960, 520, 100, 960, 520, 1100);
+const SCR = { x: 960 - 470, y: 520 - 280, w: 940, h: 560 };
+// 아자살 (亞字살) panel: double 亞 outlines linked by long straight bars, banded top/bottom
+const ajaCache = new Map();
+function ajaPolylines(pw, ph) {
+  const k = pw + 'x' + ph; if (ajaCache.has(k)) return ajaCache.get(k);
+  const P = [], b = pw * 0.15, q = b * 0.42, g = b * 0.26, band = ph * 0.085;
+  const cols = [pw * 0.29, pw * 0.71], rows = [ph * 0.32, ph * 0.68];
+  const aShape = (cx, cy, hb, nq) => [[cx - hb + nq, cy - hb], [cx + hb - nq, cy - hb], [cx + hb - nq, cy - hb + nq], [cx + hb, cy - hb + nq], [cx + hb, cy + hb - nq], [cx + hb - nq, cy + hb - nq], [cx + hb - nq, cy + hb], [cx - hb + nq, cy + hb], [cx - hb + nq, cy + hb - nq], [cx - hb, cy + hb - nq], [cx - hb, cy - hb + nq], [cx - hb + nq, cy - hb + nq], [cx - hb + nq, cy - hb]];
+  for (const cx of cols) for (const cy of rows) { P.push(aShape(cx, cy, b, q)); P.push(aShape(cx, cy, b - g, Math.max(4, q - g * 0.35))); }
+  const o = b - q; // long-bar offset = arm edge
+  for (const cx of cols) for (const dx of [-o, o]) {           // vertical bars linking motifs to the bands
+    P.push([[cx + dx, band], [cx + dx, rows[0] - b]]); P.push([[cx + dx, rows[0] + b], [cx + dx, rows[1] - b]]); P.push([[cx + dx, rows[1] + b], [cx + dx, ph - band]]);
+  }
+  for (const cy of rows) for (const dy of [-o, o]) {           // horizontal bars linking motifs to the frame
+    P.push([[0, cy + dy], [cols[0] - b, cy + dy]]); P.push([[cols[0] + b, cy + dy], [cols[1] - b, cy + dy]]); P.push([[cols[1] + b, cy + dy], [pw, cy + dy]]);
+  }
+  for (const dx of [-pw * 0.035, pw * 0.035]) P.push([[pw / 2 + dx, band], [pw / 2 + dx, ph - band]]);
+  P.push([[0, band], [pw, band]]); P.push([[0, ph - band], [pw, ph - band]]);
+  for (let i = 1; i < 9; i++) { P.push([[pw * i / 9, 0], [pw * i / 9, band]]); P.push([[pw * i / 9, ph - band], [pw * i / 9, ph]]); }
+  P.forEach(pl => { let L = 0; for (let i = 1; i < pl.length; i++) L += Math.hypot(pl[i][0] - pl[i - 1][0], pl[i][1] - pl[i - 1][1]); pl.L = L;
+    const mx = pl.reduce((s2, v) => s2 + v[0], 0) / pl.length, my = pl.reduce((s2, v) => s2 + v[1], 0) / pl.length; pl.d = Math.hypot(mx - pw / 2, my - ph / 2) / Math.hypot(pw / 2, ph / 2); });
+  ajaCache.set(k, P); return P;
+}
+function ajaLattice(c, px, py, pw, ph, bw, col, p = 1) {
+  c.save(); c.translate(px, py); c.strokeStyle = col; c.lineWidth = bw; c.lineCap = 'square'; c.lineJoin = 'miter';
+  for (const pl of ajaPolylines(pw, ph)) {
+    const q = clamp(p * 1.7 - pl.d * 0.7); if (q <= 0) continue;
+    let rem = pl.L * q; c.beginPath(); c.moveTo(pl[0][0], pl[0][1]);
+    for (let i = 1; i < pl.length && rem > 0; i++) {
+      const [x0, y0] = pl[i - 1], [x1, y1] = pl[i], l = Math.hypot(x1 - x0, y1 - y0), u = Math.min(1, rem / l);
+      c.lineTo(x0 + (x1 - x0) * u, y0 + (y1 - y0) * u); rem -= l;
+    }
+    c.stroke();
+  }
+  c.restore();
+}
+function hanjiDoor(c, px, py, pw, ph, light, latP, shadowFn) {
+  const g = c.createRadialGradient(SCR.x + SCR.w / 2, SCR.y + SCR.h / 2, 40, SCR.x + SCR.w / 2, SCR.y + SCR.h / 2, 640);
+  g.addColorStop(0, mixc('#2A1A12', K.glow, light)); g.addColorStop(1, mixc('#1E130D', '#E7A85E', light));
+  c.fillStyle = g; c.fillRect(px, py, pw, ph);
+  c.save(); c.globalAlpha = 0.5 * light; c.drawImage(hanjiTex, 0, 0, pw, ph, px, py, pw, ph); c.restore();
+  if (shadowFn) { c.save(); c.beginPath(); c.rect(px, py, pw, ph); c.clip(); shadowFn(c); c.restore(); }
+  ajaLattice(c, px, py, pw, ph, 7, K.wood, latP);
+  c.strokeStyle = K.wood; c.lineWidth = 18; c.strokeRect(px + 9, py + 9, pw - 18, ph - 18);
+}
+const HELLO_LBL = { fg: K.ink, lang: 'ENGLISH', ac: K.red };
+function sIntro(c, t) {
+  NOW = t;
+  bg(c, K.night);
+  const light = ev(t, 0.15, 1.4, E.ioCub) * (0.95 + 0.05 * Math.sin(t * 17) * Math.sin(t * 5.3)) * (1 + 0.06 * Math.min(1, SNARE()));
+  const open = ev(t, 3.9, 4.75, E.ioExpo);
+  const zoom = lerp(1, 2.25, ev(t, 3.85, 5.2, E.ioCub));
+  const { x, y, w, h } = SCR, cx = x + w / 2, cy = y + h / 2;
+  // warm spill on the night
+  const sp = c.createRadialGradient(cx, cy, 100, cx, cy, 1100);
   sp.addColorStop(0, rgba(K.warm, 0.22 * light)); sp.addColorStop(1, rgba(K.warm, 0));
   c.fillStyle = sp; c.fillRect(0, 0, W, H);
-  // paper
-  const g = c.createRadialGradient(960, 520, 50, 960, 520, 620);
-  g.addColorStop(0, mixc('#2A1A12', K.glow, light)); g.addColorStop(1, mixc('#1E130D', '#E7A85E', light));
-  c.fillStyle = g; c.fillRect(x, y, w, h);
-  c.save(); c.globalAlpha = 0.5 * light; c.drawImage(hanjiTex, x, y, w, h, x, y, w, h); c.restore();
-  if (opts.shadow) opts.shadow(c);
-  // lattice + frame
-  lattice(c, x, y, w, h, cell, 4.5, K.wood, opts.latP ?? 1, true);
-  c.strokeStyle = K.wood; c.lineWidth = 22; c.strokeRect(x - 11, y - 11, w + 22, h + 22);
-  c.fillStyle = K.wood; c.fillRect(959 - 7, y, 14, h);
-}
-function sIntro(c, t) {
-  bg(c, K.night);
-  const light = ev(t, 0.15, 1.3, E.ioCub) * (0.94 + 0.06 * Math.sin(t * 17) * Math.sin(t * 5.3));
-  const z = Math.exp(Math.log(14) * E.inExpo(prog(t, 3.35, 4.0)));
-  const fx = 960 + SCR.cell * 1.5, fy = 520 - SCR.cell * 0.5; // zoom target: a glowing cell
-  c.save(); c.translate(fx, fy); c.scale(z, z); c.translate(-fx, -fy);
-  hanjiScreen(c, t, light, {
-    latP: ev(t, 0.1, 1.5, E.ioCub),
-    shadow: c2 => {
-      if (t < 1.4) return;
-      const a = ev(t, 1.4, 2.1, E.lin), s = lerp(1.35, 1, ev(t, 1.4, 2.6, E.outCub));
-      const blur = lerp(14, 2, ev(t, 1.4, 2.6, E.outCub));
-      c2.save(); c2.beginPath(); c2.rect(SCR.x, SCR.y, SCR.w, SCR.h); c2.clip();
-      c2.filter = `blur(${blur.toFixed(1)}px)`; c2.globalAlpha = a * 0.85;
-      c2.translate(960, 520); c2.scale(s, s); c2.translate(-960, -520);
-      textC(c2, 'Hello', F(900, 260), 960, 520, '#2B160C');
-      c2.restore(); c2.filter = 'none';
-    },
-  });
+  c.save(); c.translate(cx, cy); c.scale(zoom, zoom); c.translate(-cx, -cy);
+  // the lit room behind the doors
+  if (open > 0) {
+    const rg = c.createRadialGradient(cx, cy, 30, cx, cy, 700);
+    rg.addColorStop(0, '#FFF1DA'); rg.addColorStop(1, '#F1C58C');
+    c.fillStyle = rg; c.fillRect(x, y, w, h);
+    c.save(); c.globalAlpha = 0.35; c.drawImage(hanjiTex, 0, 0, w, h, x, y, w, h); c.restore();
+  }
+  const shadow = c2 => {
+    if (t < 1.5) return;
+    const a = ev(t, 1.5, 2.3, E.lin) * (1 - ev(t, 3.75, 4.05, E.inCub)), s2 = lerp(1.35, 1, ev(t, 1.5, 3.0, E.outCub)), blur = lerp(14, 3, ev(t, 1.5, 3.0, E.outCub));
+    if (a <= 0) return;
+    c2.filter = `blur(${blur.toFixed(1)}px)`; c2.globalAlpha = a * 0.85;
+    c2.translate(cx, cy); c2.scale(s2, s2); c2.translate(-cx, -cy);
+    textC(c2, 'Hello', F(900, 250), cx, cy, '#2B160C');
+    c2.filter = 'none';
+  };
+  // doors slide apart (the shadow travels with the paper)
+  const off = open * (w / 2 + 120);
+  c.save(); c.beginPath(); c.rect(x - off - 40, y - 40, w / 2 + 40, h + 80); c.clip();
+  c.translate(-off, 0); hanjiDoor(c, x, y, w / 2, h, light, ev(t, 0.1, 1.6, E.ioCub), shadow); c.restore();
+  c.save(); c.beginPath(); c.rect(cx + off, y - 40, w / 2 + 40, h + 80); c.clip();
+  c.translate(off, 0); hanjiDoor(c, cx, y, w / 2, h, light, ev(t, 0.1, 1.6, E.ioCub), shadow); c.restore();
+  // outer frame (fades as we push in)
+  c.save(); c.globalAlpha = 1 - open; c.strokeStyle = K.wood; c.lineWidth = 22; c.strokeRect(x - 11, y - 11, w + 22, h + 22); c.restore();
   c.restore();
-  // audience silhouettes / foreground floor
-  c.save(); c.globalAlpha = 1 - ev(t, 3.3, 3.6, E.lin);
+  // revealed Hello — crisp, in screen space
+  if (t > 3.95) {
+    const p = spring(t - 3.95, 2.4, 0.5), outp = E.inExpo(prog(t, 5.45, 5.95));
+    c.save();
+    if (open < 1) { const gx = off * zoom + 2; c.beginPath(); c.rect(cx - gx, cy - h / 2 * zoom, gx * 2, h * zoom); c.clip(); }
+    charsC(c, 'Hello', F(900, 330), 960, 500, K.ink, i => {
+      const pi = spring(t - 3.98 - i * 0.05, 2.6, 0.45);
+      return { dy: (1 - pi) * 60 - outp * (700 + i * 60), sx: lerp(0.85, 1, p) * (1 + 0.03 * Math.min(1, SNARE())), sy: lerp(0.85, 1, p), a: clamp((t - 3.98 - i * 0.05) / 0.08), col: i === 4 ? K.red : K.ink };
+    });
+    c.restore();
+    if (t < 5.6) langLabel(c, HELLO_LBL, t - 4.1, 1);
+  }
+  // foreground vignette before the doors open
+  c.save(); c.globalAlpha = 1 - open;
   const fg = c.createLinearGradient(0, 860, 0, 1080); fg.addColorStop(0, 'rgba(0,0,0,0)'); fg.addColorStop(1, 'rgba(0,0,0,0.85)');
-  c.fillStyle = fg; c.fillRect(0, 860, W, 220);
-  if (t > 2.2) textC(c, 'ENGLISH', F(600, 22), 960, 960, rgba(K.glow, 0.8 * ev(t, 2.2, 2.6, E.lin)), { ls: 10 });
-  c.restore();
-  const fl = ev(t, 3.75, 4.0, E.inCub);
-  if (fl > 0) { c.fillStyle = rgba(K.glow, fl); c.fillRect(-100, -100, W + 200, H + 200); }
+  c.fillStyle = fg; c.fillRect(0, 860, W, 220); c.restore();
+  bandWipe(c, t, 6.0);
 }
 
 // =====================================================================
-//  SCENE 1+2 — GREETING MONTAGE (4 → 18s)
+//  SCENE 1+2 — GREETING MONTAGE (6 → 15s)
 // =====================================================================
 function sMontage(c, t) { // t = global
+  NOW = t;
   let idx = 0; for (let i = 0; i < G.length; i++) if (t >= G[i].t) idx = i;
   const g = G[idx];
   drawGreeting(c, g, t - g.t, idx + 2);
-  // 단청 band wipes on a few cuts (accent)
-  for (const at of [7.0, 10.0, 12.0, 16.0]) {
-    const p = prog(t, at - 0.18, at + 0.18); if (p <= 0 || p >= 1) continue;
-    const n = DAN.length, bw = W / n;
-    for (let i = 0; i < n; i++) {
-      const q = Math.sin(clamp(p * 1.6 - i * 0.07) * Math.PI);
-      c.fillStyle = DAN[i]; c.fillRect(i * bw - 1, H / 2 - H / 2 * q - 2, bw + 2, H * q + 4);
-    }
-  }
-  // intro flash carry-in
-  const fl = 1 - ev(t, 4.0, 4.22, E.outCub);
-  if (fl > 0) { c.fillStyle = rgba(K.glow, fl); c.fillRect(-100, -100, W + 200, H + 200); }
+  for (const at of [8.0, 12.0]) bandWipe(c, t, at, 0.14);
+  bandWipe(c, t, 6.0);
 }
 
 // =====================================================================
 //  SCENE 3 — WALL OF GREETINGS (18 → 20s)
 // =====================================================================
 const WALL = (() => {
-  const words = ['Hello', 'Hola', 'Bonjour', 'Ciao', 'こんにちは', 'Olá', 'Привет', '你好', 'Merhaba', 'Hallo', 'Xin chào', 'สวัสดี', 'नमस्ते', 'مرحبا', 'Γεια σου', 'Aloha'];
+  const words = ['Aloha', 'Hej', 'Hello', 'Kia ora', 'こんにちは', 'Sawubona', 'Привет', '你好', 'Hola', 'Hallo', 'Xin chào', 'สวัสดี', 'नमस्ते', 'مرحبا', 'Γεια σου', 'Bonjour'];
   const R = rng(4), cells = [];
   for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) cells.push([i, j]);
   for (let i = cells.length - 1; i > 0; i--) { const k = Math.floor(R() * (i + 1)); [cells[i], cells[k]] = [cells[k], cells[i]]; }
   return words.map((w, i) => ({ w, x: 240 + cells[i][0] * 480 + (R() - 0.5) * 30, y: 135 + cells[i][1] * 270 + (R() - 0.5) * 30,
-    size: 90 + R() * 70, col: [K.red, K.yellow, K.white, K.blue, K.green, K.warm][i % 6], t: 18.0 + i * 0.125, rot: (R() - 0.5) * 0.12 }));
+    size: 90 + R() * 70, col: [K.red, K.yellow, K.white, K.blue, K.green, K.warm][i % 6], t: 15.0 + i * 0.125, rot: (R() - 0.5) * 0.12 }));
 })();
 function drawWall(c, t, suck = 0) {
   for (const wd of WALL) {
     if (t < wd.t) continue;
-    const s = spring(t - wd.t, 3.2, 0.42) * (1 - suck * 0.85);
+    const s = spring(t - wd.t, 3.2, 0.42) * (1 - suck * 0.85) * (1 + 0.05 * Math.min(1, HAT(t) + SNARE(t)));
     const x = lerp(wd.x, 960, E.inExpo(suck)), y = lerp(wd.y, 520, E.inExpo(suck));
     c.save(); c.translate(x, y); c.rotate(wd.rot * (1 - suck) + suck * 2); c.scale(s, s);
     c.globalAlpha = 1 - E.inExpo(suck) * 0.6;
@@ -419,8 +478,9 @@ function drawWall(c, t, suck = 0) {
   }
 }
 function sWall(c, t) {
+  NOW = t;
   bg(c, K.ink);
-  lattice(c, 0, 0, W, H, 135, 1.2, rgba(K.warm, 0.08), 1);
+  lattice(c, 0, 0, W, H, 135, 1.2, rgba(K.warm, 0.08 + 0.08 * Math.min(1, SNARE(t))), 1);
   drawWall(c, t, 0);
 }
 
@@ -450,7 +510,8 @@ function eavePath(c, u0, u1, off = 0) {
   for (let i = 0; i <= 80; i++) { const u = lerp(u0, u1, i / 80); const x = eaveX(u), y = eaveY(u) + off; i ? c.lineTo(x, y) : c.moveTo(x, y); }
 }
 function sBreath(c, t) {
-  const lt = t - 20;
+  NOW = t;
+  const lt = t < 18.3 ? t - 17.6 : 0.7 + (t - 18.3) / 2.846;
   // night sky with a warm horizon
   const sky = c.createLinearGradient(0, 0, 0, H);
   sky.addColorStop(0, '#120F22'); sky.addColorStop(0.65, '#1C1424'); sky.addColorStop(1, '#3A1F17');
@@ -466,7 +527,7 @@ function sBreath(c, t) {
     g.addColorStop(0, rgba(K.glow, 0.95)); g.addColorStop(0.2, rgba(K.warm, 0.5)); g.addColorStop(1, rgba(K.warm, 0));
     c.fillStyle = g; c.fillRect(0, 0, W, H);
   }
-  const zoom = 1 + 0.5 * E.inExpo(prog(lt, 1.6, 2.0));
+  const zoom = 1 + 0.5 * E.inExpo(prog(t, 21.45, 22.0));
   c.save(); c.translate(960, 560); c.scale(zoom, zoom); c.translate(-960, -560);
   // roof silhouette (rises behind the line)
   const sil = ev(lt, 0.85, 1.5, E.outCub);
@@ -507,14 +568,14 @@ function sBreath(c, t) {
     const u = 0.04 + 0.92 * k / (NM - 1), d = Math.abs(k - (NM - 1) / 2);
     const p = prog(lt, 1.15 + d * 0.035, 1.6 + d * 0.035);
     if (p <= 0) continue;
-    medallion(c, eaveX(u), eaveY(u) + 90, 30, p, lt * 0.8);
+    medallion(c, eaveX(u), eaveY(u) + 90, 30 * (1 + 0.12 * Math.min(1, SNARE(t) + HAT(t))), p, t * 0.5);
   }
   c.restore();
   bandWipe(c, t, 22.0);
 }
 // 단청 stripes wipe (used across the drop)
-function bandWipe(c, t, at) {
-  const p = prog(t, at - 0.16, at + 0.2); if (p <= 0 || p >= 1) return;
+function bandWipe(c, t, at, hw = 0.18) {
+  const p = prog(t, at - hw * 0.9, at + hw * 1.1); if (p <= 0 || p >= 1) return;
   const n = DAN.length, bw = W / n;
   for (let i = 0; i < n; i++) {
     const q = Math.sin(clamp(p * 1.5 - i * 0.06) * Math.PI);
@@ -536,7 +597,7 @@ function sylColor(i, lt) {
 }
 function drawEoseowa(c, lt, o = {}) {
   const font = F(900, 400);
-  const pump = lt > 0.5 ? 1 + 0.028 * Math.exp(-((lt - 0.5) % 0.5) * 11) : 1;
+  const pump = 1 + 0.032 * Math.min(1.2, KICK(22 + lt));
   c.save(); c.translate(960, 470); c.scale(pump, pump); c.translate(-960, -470);
   charsC(c, '어서와', font, 960, 470, K.ink, i => {
     const st = i * 0.09, p = spring(lt - st, 2.8, 0.45);
@@ -552,6 +613,7 @@ function drawEoseowa(c, lt, o = {}) {
   c.restore();
 }
 function sWelcome(c, t) { // t = global
+  NOW = t;
   const lt = t - 22;
   paperBg(c, K.paper);
   const push = lerp(1, 1.06, ev(lt, 0, 8, E.ioCub)) * (1 + 0.04 * Math.exp(-Math.max(0, lt - 6.0) * 6) * (lt > 6.0 ? 1 : 0));
@@ -579,7 +641,7 @@ function sWelcome(c, t) { // t = global
   for (const d of MEDS) {
     const p = spring(lt - 0.15 - d.d, 2.4, 0.5);
     if (p <= 0) continue;
-    const beatPulse = lt > 0.5 ? 1 + 0.12 * Math.exp(-((lt - 0.5) % 0.5) * 9) : 1;
+    const beatPulse = 1 + 0.22 * Math.min(1, KICK(t));
     const x = lerp(960, d.x, Math.min(1.08, p)) + Math.sin(lt * 0.8 + d.ph) * 12, y = lerp(470, d.y, Math.min(1.08, p)) + Math.cos(lt * 1.0 + d.ph) * 9;
     medallion(c, x, y, d.s * beatPulse * (lt > 6.0 ? 1 + 0.3 * Math.exp(-(lt - 6.0) * 5) : 1), clamp(p), lt * 0.6 + d.ph);
   }
@@ -599,6 +661,7 @@ function sWelcome(c, t) { // t = global
   // 단청 band: unrolls, then a shimmer runs along it
   const bx = 960 - 520, by = 735;
   dancheongBand(c, bx, by, 1040, 30, prog(lt, 0.6, 1.5));
+  if (lt > 1.5) { const sf = Math.min(1, SNARE(t)); if (sf > 0.02) { c.fillStyle = `rgba(255,255,255,${0.55 * sf})`; c.fillRect(bx, by, 1040, 30); } }
   const sh = prog(lt, 2.6, 3.4);
   if (sh > 0 && sh < 1) { const x = lerp(bx - 80, bx + 1120, E.ioCub(sh)); c.fillStyle = 'rgba(255,255,255,0.6)'; c.fillRect(x, by, 50, 30); }
   // WELCOME TO KOREA
@@ -614,22 +677,25 @@ function sWelcome(c, t) { // t = global
 //  TIMELINE + FX
 // =====================================================================
 const SCENES = [
-  { a: 0, b: 4, f: (c, t) => sIntro(c, t) },
-  { a: 4, b: 18, f: (c, t) => sMontage(c, t + 4) },
-  { a: 18, b: 20, f: (c, t) => sWall(c, t + 18) },
-  { a: 20, b: 22, f: (c, t) => sBreath(c, t + 20) },
+  { a: 0, b: 6, f: (c, t) => sIntro(c, t) },
+  { a: 6, b: 15, f: (c, t) => sMontage(c, t + 6) },
+  { a: 15, b: 17.6, f: (c, t) => sWall(c, t + 15) },
+  { a: 17.6, b: 22, f: (c, t) => sBreath(c, t + 17.6) },
   { a: 22, b: 30.1, f: (c, t) => sWelcome(c, t + 22) },
 ];
-const IMPACTS = [[4.0, 10], [8.0, 8], [12.0, 8], [15.5, 8], [16.0, 6], [22.0, 26], [22.09, 12], [22.18, 12], [24.0, 6], [26.0, 6], [28.0, 12]];
-const CA_HITS = [[4.0, 8], [8.0, 6], [12.0, 8], [16.0, 6], [18.0, 6], [21.9, 10], [22.0, 16], [28.0, 8]];
+const IMPACTS = [[3.95, 6], [6.0, 12], [8.0, 6], [12.0, 6], [14.0, 8], [22.0, 26], [22.09, 12], [22.18, 12], [28.0, 10]];
+const CA_HITS = [[6.0, 10], [8.0, 6], [12.0, 6], [14.0, 8], [15.0, 6], [21.9, 10], [22.0, 16], [28.0, 8]];
 function shake(t) {
   let x = 0, y = 0;
   for (const [ti, a] of IMPACTS) { if (t < ti || t > ti + 0.6) continue; const d = t - ti, e = a * Math.exp(-d * 11); x += e * Math.sin(d * 71 + ti * 13); y += e * Math.cos(d * 59 + ti * 7); }
+  const amp = t >= 22 ? 4.5 : t >= 6 && t < 15 ? 2.2 : 0;
+  if (amp) for (const [ti, sv] of AEV.kick) { if (ti > t) break; const d = t - ti; if (d < 0.3) { const e = amp * sv * Math.exp(-d * 20); x += e * Math.sin(d * 90 + ti * 17); y += e * Math.cos(d * 70 + ti * 11); } }
   return [x, y];
 }
 function caAmount(t) {
   let a = 0;
   for (const [ti, v] of CA_HITS) if (t >= ti - 0.05 && t < ti + 0.5) a += v * Math.exp(-Math.max(0, t - ti) * 9) * (t < ti ? (t - ti + 0.05) / 0.05 : 1);
+  if (t >= 6) a += 3 * Math.min(1, aenv(AEV.snare, t, 18));
   return a;
 }
 function drawScene(c, t) {
