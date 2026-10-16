@@ -383,21 +383,20 @@ function hanjiDoor(c, px, py, pw, ph, light, latP, shadowFn) {
   ajaLattice(c, px, py, pw, ph, 7, K.wood, latP);
   c.strokeStyle = K.wood; c.lineWidth = 18; c.strokeRect(px + 9, py + 9, pw - 18, ph - 18);
 }
-const HELLO_LBL = { fg: K.ink, lang: 'ENGLISH', ac: K.red };
 // Hello after the doors open: entrance → wave hop → weight wave (Thin↔Black) →
 // tracking open + 오방색 + outline echoes → scatter & regroup → exit up
 const HELLO = 'Hello', HSZ = 330, HCOL2 = [K.blue, K.red, K.green, K.ink, K.red];
 function helloSeq(c, t) {
   const n = HELLO.length, base = metrics(HELLO, F(900, HSZ)), cy = 500;
   const by = cy + (base.asc - base.desc) / 2;
-  const tr = Math.sin(prog(t, 3.8, 4.5) * Math.PI), ls = 90 * tr;
-  const sc = Math.sin(prog(t, 4.6, 5.3) * Math.PI);
+  const tr = Math.sin(prog(t, 4.1, 4.7) * Math.PI), ls = 90 * tr;
+  const sc = Math.sin(prog(t, 4.85, 5.4) * Math.PI);
   // per-letter weight (variable-weight wave through Pretendard Thin..Black)
-  const wts = [...HELLO].map((_, i) => { const q = Math.sin(clamp((t - 2.9 - i * 0.08) / 0.55) * Math.PI); return Math.max(100, Math.min(900, Math.round((900 - 800 * q) / 100) * 100)); });
+  const wts = [...HELLO].map(() => 900);
   const ws = [...HELLO].map((ch, i) => metrics(ch, F(wts[i], HSZ)).width);
   const tot = ws.reduce((a, b) => a + b, 0) + ls * (n - 1);
   // outline echoes stacked above/below during the tracking move
-  const ea = Math.sin(prog(t, 3.75, 4.75) * Math.PI);
+  const ea = Math.sin(prog(t, 4.05, 4.85) * Math.PI);
   if (ea > 0.01) for (const k of [-2, -1, 1, 2]) {
     c.save(); c.globalAlpha = ea * (Math.abs(k) === 1 ? 0.5 : 0.25);
     textC(c, HELLO, F(900, HSZ), 960 + k * 40 * ea, cy + k * 230 * ea, null, { stroke: K.ink, lw: 2.5, ls });
@@ -405,12 +404,12 @@ function helloSeq(c, t) {
   }
   let x = 960 - tot / 2;
   for (let i = 0; i < n; i++) {
-    const st = 1.32 + i * 0.05, pin = spring(t - st, 2.6, 0.45);
+    const st = 3.1 + i * 0.04, pin = spring(t - st, 2.8, 0.45);
     if (t < st) { x += ws[i] + ls; continue; }
-    const hop = Math.sin(prog(t, 2.2 + i * 0.07, 2.5 + i * 0.07) * Math.PI) * 70;
+    const hop = Math.sin(prog(t, 3.6 + i * 0.06, 3.88 + i * 0.06) * Math.PI) * 70;
     const ang = (i - 2) * 0.55 - Math.PI / 2;
     const dx = Math.cos(ang) * 300 * sc * (i === 2 ? 0.2 : 1), dyS = Math.sin(ang) * 120 * sc + (i === 2 ? -160 * sc : 0);
-    const out = E.inExpo(prog(t, 5.45, 5.95)) * (700 + i * 60);
+    const out = E.inExpo(prog(t, 5.5, 5.95)) * (700 + i * 60);
     const s2 = lerp(0.85, 1, pin) * (1 + 0.18 * sc);
     const col = tr > 0.3 ? HCOL2[i] : (i === 4 ? K.red : K.ink);
     c.save();
@@ -424,55 +423,62 @@ function helloSeq(c, t) {
     x += ws[i] + ls;
   }
 }
+// 안녕 — slam in, weight wave (Thin↔Black), tracking hop; 녕 in red (bookends 어서와)
+const ANN = ['안', '녕'];
+function annyeongSeq(c, t) {
+  const SZ = 400, cy = 500, base = metrics('안녕', F(900, SZ));
+  const by = cy + (base.asc - base.desc) / 2;
+  const wts = ANN.map((_, i) => { const q = Math.sin(clamp((t - 0.95 - i * 0.16) / 0.6) * Math.PI); return Math.max(100, Math.min(900, Math.round((900 - 800 * q) / 100) * 100)); });
+  const ws = ANN.map((ch, i) => metrics(ch, F(wts[i], SZ)).width);
+  const tr = Math.sin(prog(t, 1.95, 2.65) * Math.PI), ls = 120 * tr;
+  let x = 960 - (ws[0] + ws[1] + ls) / 2;
+  ANN.forEach((ch, i) => {
+    const st = 0.12 + i * 0.14, p = spring(t - st, 2.6, 0.42);
+    if (t < st) { x += ws[i] + ls; return; }
+    const hop = Math.sin(prog(t, 2.0 + i * 0.1, 2.32 + i * 0.1) * Math.PI) * 60;
+    const sc = lerp(1.8, 1, p);
+    c.save(); c.globalAlpha = clamp((t - st) / 0.05);
+    c.translate(x + ws[i] / 2, by - base.asc / 2 - hop + (1 - p) * -40);
+    c.rotate((1 - p) * (i ? 0.3 : -0.3)); c.scale(sc, sc);
+    c.font = F(wts[i], SZ); c.fillStyle = i ? K.red : K.ink; c.textBaseline = 'alphabetic';
+    c.fillText(ch, -ws[i] / 2, base.asc / 2); c.restore();
+    x += ws[i] + ls;
+  });
+}
+// quick 아자살 lattice wipe: two backlit panels snap shut and open again
+function latticeWipe(c, t, a0, a1, b0, b1) {
+  const close = ev(t, a0, a1, E.ioExpo), open = ev(t, b0, b1, E.ioExpo);
+  const cover = close * (1 - open);
+  if (cover <= 0.001) return;
+  const hw = W / 2, off = (1 - cover) * (hw + 60);
+  for (const side of [-1, 1]) {
+    const px = side < 0 ? -off : hw + off;
+    c.save(); c.beginPath(); c.rect(px, 0, hw, H); c.clip();
+    const g = c.createRadialGradient(960, 540, 60, 960, 540, 1100);
+    g.addColorStop(0, K.glow); g.addColorStop(1, '#E7A85E');
+    c.fillStyle = g; c.fillRect(px, 0, hw, H);
+    c.globalAlpha = 0.5; c.drawImage(hanjiTex, 0, 0, hw, H, px, 0, hw, H); c.globalAlpha = 1;
+    ajaLattice(c, px + 20, 20, hw - 40, H - 40, 12, K.wood, 1);
+    c.strokeStyle = K.wood; c.lineWidth = 40; c.strokeRect(px + 20, 20, hw - 40, H - 40);
+    c.restore();
+  }
+}
+const ANN_LBL = { fg: K.ink, lang: '한국어', ac: K.red };
+const HELLO_LBL = { fg: K.ink, lang: 'ENGLISH', ac: K.red };
 function sIntro(c, t) {
   NOW = t;
-  bg(c, K.night);
-  const light = ev(t, 0.05, 0.7, E.ioCub);
-  const open = ev(t, 1.25, 1.9, E.ioExpo);
-  const zoom = lerp(1, 2.25, ev(t, 1.2, 2.4, E.ioCub));
-  const { x, y, w, h } = SCR, cx = x + w / 2, cy = y + h / 2;
-  // warm spill on the night
-  const sp = c.createRadialGradient(cx, cy, 100, cx, cy, 1100);
-  sp.addColorStop(0, rgba(K.warm, 0.22 * light)); sp.addColorStop(1, rgba(K.warm, 0));
-  c.fillStyle = sp; c.fillRect(0, 0, W, H);
-  c.save(); c.translate(cx, cy); c.scale(zoom, zoom); c.translate(-cx, -cy);
-  // the lit room behind the doors
-  if (open > 0) {
-    const rg = c.createRadialGradient(cx, cy, 30, cx, cy, 700);
-    rg.addColorStop(0, '#FFF1DA'); rg.addColorStop(1, '#F1C58C');
-    c.fillStyle = rg; c.fillRect(x, y, w, h);
-    c.save(); c.globalAlpha = 0.35; c.drawImage(hanjiTex, 0, 0, w, h, x, y, w, h); c.restore();
-  }
-  const shadow = c2 => {
-    if (t < 0.45) return;
-    const a = ev(t, 0.45, 0.9, E.lin) * (1 - ev(t, 1.15, 1.35, E.inCub)), s2 = lerp(1.35, 1, ev(t, 0.45, 1.2, E.outCub)), blur = lerp(14, 3, ev(t, 0.45, 1.2, E.outCub));
-    if (a <= 0) return;
-    c2.filter = `blur(${blur.toFixed(1)}px)`; c2.globalAlpha = a * 0.85;
-    c2.translate(cx, cy); c2.scale(s2, s2); c2.translate(-cx, -cy);
-    textC(c2, 'Hello', F(900, 250), cx, cy, '#2B160C');
-    c2.filter = 'none';
-  };
-  // doors slide apart (the shadow travels with the paper)
-  const off = open * (w / 2 + 120);
-  c.save(); c.beginPath(); c.rect(x - off - 40, y - 40, w / 2 + 40, h + 80); c.clip();
-  c.translate(-off, 0); hanjiDoor(c, x, y, w / 2, h, light, ev(t, 0.0, 0.8, E.ioCub), shadow); c.restore();
-  c.save(); c.beginPath(); c.rect(cx + off, y - 40, w / 2 + 40, h + 80); c.clip();
-  c.translate(off, 0); hanjiDoor(c, cx, y, w / 2, h, light, ev(t, 0.0, 0.8, E.ioCub), shadow); c.restore();
-  // outer frame (fades as we push in)
-  c.save(); c.globalAlpha = 1 - open; c.strokeStyle = K.wood; c.lineWidth = 22; c.strokeRect(x - 11, y - 11, w + 22, h + 22); c.restore();
-  c.restore();
-  // revealed Hello — crisp, in screen space, then a run of typographic moves
-  if (t > 1.3) {
-    c.save();
-    if (open < 1) { const gx = off * zoom + 2; c.beginPath(); c.rect(cx - gx, cy - h / 2 * zoom, gx * 2, h * zoom); c.clip(); }
+  paperBg(c, K.paper);
+  const rg = c.createRadialGradient(960, 500, 60, 960, 500, 1100);
+  rg.addColorStop(0, 'rgba(255,236,205,0.55)'); rg.addColorStop(1, 'rgba(233,180,120,0.35)');
+  c.fillStyle = rg; c.fillRect(-100, -100, W + 200, H + 200);
+  if (t < 3.03) {
+    annyeongSeq(c, t);
+    langLabel(c, ANN_LBL, t - 0.3, 1);
+  } else {
     helloSeq(c, t);
-    c.restore();
-    if (t < 5.6) langLabel(c, HELLO_LBL, t - 1.6, 1);
+    if (t < 5.6) langLabel(c, HELLO_LBL, t - 3.25, 2);
   }
-  // foreground vignette before the doors open
-  c.save(); c.globalAlpha = 1 - open;
-  const fg = c.createLinearGradient(0, 860, 0, 1080); fg.addColorStop(0, 'rgba(0,0,0,0)'); fg.addColorStop(1, 'rgba(0,0,0,0.85)');
-  c.fillStyle = fg; c.fillRect(0, 860, W, 220); c.restore();
+  latticeWipe(c, t, 2.78, 3.0, 3.06, 3.34);
   bandWipe(c, t, 6.0);
 }
 
@@ -483,7 +489,7 @@ function sMontage(c, t) { // t = global
   NOW = t;
   let idx = 0; for (let i = 0; i < G.length; i++) if (t >= G[i].t) idx = i;
   const g = G[idx];
-  drawGreeting(c, g, t - g.t, idx + 2);
+  drawGreeting(c, g, t - g.t, idx + 3);
   for (const at of [8.0, 12.0]) bandWipe(c, t, at, 0.14);
   bandWipe(c, t, 6.0);
 }
@@ -513,7 +519,7 @@ function drawWall(c, t, suck = 0) {
 function sWall(c, t) {
   NOW = t;
   bg(c, K.ink);
-  lattice(c, 0, 0, W, H, 135, 1.2, rgba(K.warm, 0.08), 1);
+  lattice(c, 0, 0, W, H, 135, 1.2, rgba(K.warm, 0.08 + 0.08 * Math.min(1, SNARE(t))), 1);
   drawWall(c, t, 0);
 }
 
@@ -694,6 +700,7 @@ function sWelcome(c, t) { // t = global
   // 단청 band: unrolls, then a shimmer runs along it
   const bx = 960 - 520, by = 735;
   dancheongBand(c, bx, by, 1040, 30, prog(lt, 0.6, 1.5));
+  if (lt > 1.5) { const sf = Math.min(1, SNARE(t)); if (sf > 0.02) { c.fillStyle = `rgba(255,255,255,${0.55 * sf})`; c.fillRect(bx, by, 1040, 30); } }
   const sh = prog(lt, 2.6, 3.4);
   if (sh > 0 && sh < 1) { const x = lerp(bx - 80, bx + 1120, E.ioCub(sh)); c.fillStyle = 'rgba(255,255,255,0.6)'; c.fillRect(x, by, 50, 30); }
   // WELCOME TO KOREA
@@ -715,7 +722,7 @@ const SCENES = [
   { a: 17.6, b: 22, f: (c, t) => sBreath(c, t + 17.6) },
   { a: 22, b: 30.1, f: (c, t) => sWelcome(c, t + 22) },
 ];
-const IMPACTS = [[3.95, 6], [6.0, 12], [8.0, 6], [12.0, 6], [14.0, 8], [22.0, 26], [22.09, 12], [22.18, 12], [28.0, 10]];
+const IMPACTS = [[0.12, 8], [3.0, 6], [6.0, 12], [8.0, 6], [12.0, 6], [14.0, 8], [22.0, 26], [22.09, 12], [22.18, 12], [28.0, 10]];
 const CA_HITS = [[6.0, 10], [8.0, 6], [12.0, 6], [14.0, 8], [15.0, 6], [21.9, 10], [22.0, 16], [28.0, 8]];
 function shake(t) {
   let x = 0, y = 0;
@@ -727,6 +734,7 @@ function shake(t) {
 function caAmount(t) {
   let a = 0;
   for (const [ti, v] of CA_HITS) if (t >= ti - 0.05 && t < ti + 0.5) a += v * Math.exp(-Math.max(0, t - ti) * 9) * (t < ti ? (t - ti + 0.05) / 0.05 : 1);
+  if (t >= 6) a += 3 * Math.min(1, aenv(AEV.snare, t, 18));
   return a;
 }
 function drawScene(c, t) {
