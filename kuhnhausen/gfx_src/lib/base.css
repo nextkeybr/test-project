@@ -1,0 +1,23 @@
+/* 무지인간 GFX 공통 스타일 — 색은 다섯 가지만 쓴다 */
+@font-face { font-family: "Pretendard"; font-weight: 700; src: url("../node_modules/pretendard/dist/web/static/woff2/Pretendard-Bold.woff2") format("woff2"); }
+@font-face { font-family: "Pretendard"; font-weight: 800; src: url("../node_modules/pretendard/dist/web/static/woff2/Pretendard-ExtraBold.woff2") format("woff2"); }
+
+:root {
+  --black: #0B0B0B;
+  --yellow: #FFD400;
+  --red: #E8202A;
+  --white: #F2F2F2;
+  --green: #00F078;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: transparent; }
+body { font-family: "Pretendard", sans-serif; font-weight: 700; color: var(--white);
+  -webkit-font-smoothing: antialiased; word-break: keep-all; }
+
+#stage { position: absolute; inset: 0; width: 1920px; height: 1080px; overflow: hidden; }
+#stage.full { background: var(--black); }
+
+/* T05 고정 라벨 */
+.t05 { position: absolute; height: 44px; padding: 0 16px; display: inline-flex; align-items: center;
+  background: var(--yellow); color: var(--black); font-size: 30px; font-weight: 800; line-height: 1; white-space: nowrap; }
