@@ -72,10 +72,18 @@
     tag.textContent = line.speaker;
     const txt = document.createElement("div");
     txt.className = "t01-text";
-    txt.textContent = line.text;
+    let mark = null;
+    const i = line.mark ? line.text.indexOf(line.mark.text) : -1;
+    if (i >= 0) {
+      mark = document.createElement("span");
+      mark.textContent = line.mark.text;
+      txt.append(line.text.slice(0, i), mark, line.text.slice(i + line.mark.text.length));
+    } else {
+      txt.textContent = line.text;
+    }
     row.append(tag, txt);
     list.appendChild(row);
-    return { row, tag, txt };
+    return { row, tag, txt, mark };
   }
 
   window.buildT01 = function (stage, tl, cfg) {
@@ -102,6 +110,21 @@
 
     const dimOld = cfg.dimOld ?? 0.6;
     const lines = cfg.lines.map((l) => ({ ...l, el: makeLine(list, l) }));
+
+    // 강조할 구절 아래 레드 밑줄. 대화 줄이 어두워져도 밝게 남도록 stage에 따로 올린다.
+    // 위치는 애니메이션 초기값을 걸기 전, 최종 배치 기준으로 잰다.
+    lines.forEach((l) => {
+      if (!l.el.mark) return;
+      const s = stage.getBoundingClientRect();
+      for (const r of l.el.mark.getClientRects()) {
+        const u = document.createElement("div");
+        Object.assign(u.style, { position: "absolute", left: r.left - s.left + "px", top: r.bottom - s.top + 2 + "px",
+          width: r.width + "px", height: "6px", background: "var(--red)", transformOrigin: "left center" });
+        stage.appendChild(u);
+        gsap.set(u, { scaleX: 0 });
+        tl.to(u, { scaleX: 1, duration: 0.4, ease: "power3.out" }, l.mark.at);
+      }
+    });
 
     lines.forEach((l, idx) => {
       const { row, tag, txt } = l.el;
