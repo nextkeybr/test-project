@@ -5,6 +5,10 @@
 //   cfg.speech     [[시작, 끝], ...]  파형이 말소리처럼 커지는 구간(초)
 //   cfg.flatAt     파형이 뚝 멈추는 시각(초). 없으면 끝까지 움직임
 //   cfg.dimOld     새 줄이 생길 때 윗줄 투명도 (기본 0.6)
+//   cfg.labelAt    라벨 등장 시각(없으면 처음부터 보임)
+//   cfg.waveReveal [시각, 길이]  파형이 가운데서 양옆으로 펼쳐짐(없으면 처음부터 펼쳐짐)
+//   cfg.top        대화 줄 시작 y (기본 340)
+//   line.blur      true면 글자를 흐리게(읽을 수 없게), line.unblurAt 에 걷힘
 (function () {
   const WAVE_W = 1200, WAVE_H = 150, WAVE_Y = 110;
   const BAR_W = 4, BAR_GAP = 4, BARS = WAVE_W / (BAR_W + BAR_GAP);
@@ -104,8 +108,14 @@
     Object.assign(label.style, { right: "80px", top: "60px" });
     stage.appendChild(label);
 
+    if (cfg.labelAt != null) {
+      gsap.set(label, { opacity: 0, x: 16 });
+      tl.to(label, { opacity: 1, x: 0, duration: 0.4, ease: "power3.out" }, cfg.labelAt);
+    }
+
     const list = document.createElement("div");
     list.className = "t01-list";
+    if (cfg.top != null) list.style.top = cfg.top + "px";
     stage.appendChild(list);
 
     const dimOld = cfg.dimOld ?? 0.6;
@@ -128,16 +138,20 @@
 
     lines.forEach((l, idx) => {
       const { row, tag, txt } = l.el;
+      if (l.blur) {
+        gsap.set(txt, { filter: "blur(13px)" });
+        if (l.unblurAt != null) tl.to(txt, { filter: "blur(0px)", duration: 0.7, ease: "power2.out" }, l.unblurAt);
+      }
       if (l.state === "shown") {
         gsap.set(row, { opacity: l.opacity ?? 1 });
         return;
       }
       gsap.set(row, { opacity: 1 });
       gsap.set(tag, { opacity: 0, x: -16 });
-      gsap.set(txt, { opacity: 0, y: 12, clipPath: "inset(0% 100% 0% 0%)" });
+      gsap.set(txt, { opacity: 0, y: 12, clipPath: "inset(-20% 100% -20% 0%)" });
       tl.to(tag, { opacity: 1, x: 0, duration: 0.3, ease: "power3.out" }, l.at);
       tl.to(txt, { opacity: 1, y: 0, duration: 0.45, ease: "power3.out" }, l.at + 0.08);
-      tl.to(txt, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.5, ease: "power2.out" }, l.at + 0.08);
+      tl.to(txt, { clipPath: "inset(-20% 0% -20% 0%)", duration: 0.5, ease: "power2.out" }, l.at + 0.08);
       // 윗줄들 옅게
       lines.slice(0, idx).forEach((p) => {
         tl.to(p.el.row, { opacity: dimOld, duration: 0.35, ease: "power2.out" }, l.at);
@@ -145,6 +159,10 @@
     });
 
     const wave = makeWave(stage, cfg);
+    if (cfg.waveReveal) {
+      wave.reveal = 0;
+      tl.to(wave, { reveal: 1, duration: cfg.waveReveal[1], ease: "power3.out" }, cfg.waveReveal[0]);
+    }
     return { lines, wave, list, label };
   };
 })();
