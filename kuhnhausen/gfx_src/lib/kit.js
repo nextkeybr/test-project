@@ -33,7 +33,9 @@
     // 선이 그려지듯 (stroke-dashoffset)
     draw(tl, path, at, dur = 0.6, ease = "power2.inOut") {
       const len = path.getTotalLength();
-      gsap.set(path, { strokeDasharray: len, strokeDashoffset: len });
+      // 그리기 전에는 숨김(둥근·사각 선 끝이 점으로 미리 보이지 않게)
+      gsap.set(path, { strokeDasharray: len, strokeDashoffset: len, opacity: 0 });
+      tl.set(path, { opacity: 1 }, at);
       tl.to(path, { strokeDashoffset: 0, duration: dur, ease }, at);
       return path;
     },
@@ -61,6 +63,12 @@
 
     out(tl, els, at, dur = 0.28) {
       tl.to(els, { opacity: 0, y: -8, duration: dur, ease: "power2.in" }, at);
+    },
+
+    // 말자막 자리(y 880~1080)를 비우는 가림막. 배경 격자·지도선·벽선이 아래로 넘어가지 않게(풀프레임 템플릿용)
+    bottomMask(stage) {
+      return K.div(stage, { left: "0px", top: "856px", width: "1920px", height: "224px", zIndex: 4,
+        background: "linear-gradient(rgba(11,11,11,0) 0px, #0B0B0B 24px)" });
     },
 
     // 타임라인 길이를 클립 길이에 맞춤

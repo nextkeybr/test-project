@@ -27,6 +27,7 @@
     K.div(world, { left: "-1920px", top: "-1080px", width: "5760px", height: "3240px",
       backgroundImage: "linear-gradient(rgba(242,242,242,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(242,242,242,0.06) 1px, transparent 1px)",
       backgroundSize: "60px 60px" });
+    K.bottomMask(stage);
     const strSvg = K.svg(world);       // 실은 카드 밑에 깔린다
     const cardLayer = K.div(world, { left: "0px", top: "0px" });
     const labelLayer = K.div(world, { left: "0px", top: "0px", zIndex: 3 });

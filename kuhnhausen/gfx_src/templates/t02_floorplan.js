@@ -31,6 +31,7 @@
 
   window.buildT02 = function (stage, tl, cfg = {}) {
     const world = K.div(stage, { left: "0px", top: "0px", width: "1920px", height: "1080px", transformOrigin: "0 0" });
+    K.bottomMask(stage);
     const svg = K.svg(world);
     const walls = K.node(svg, "g");
     const extra = K.node(svg, "g");

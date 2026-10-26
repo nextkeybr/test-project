@@ -7,7 +7,7 @@ window.CLIP = {
   build(stage, tl) {
     const fp = buildT02(stage, tl, {});
     fp.body(tl, 1.0, [600, 322]);
-    fp.arrow(tl, [[150, 820], [150, 660], [250, 440], [430, 330]], 2.0, 0.8);
+    fp.arrow(tl, [[150, 750], [150, 660], [250, 440], [430, 330]], 2.0, 0.8);
     K.hold(tl, 5);
   },
 };

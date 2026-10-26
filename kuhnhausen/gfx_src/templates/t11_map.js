@@ -30,7 +30,8 @@
     Object.assign(cv.style, { position: "absolute", left: "0px", top: "0px" });
     stage.appendChild(cv);
     const ctx = cv.getContext("2d");
-    const layer = K.div(stage, { left: "0px", top: "0px", width: "1920px", height: "1080px" });
+    K.bottomMask(stage);
+    const layer = K.div(stage, { left: "0px", top: "0px", width: "1920px", height: "1080px", zIndex: 5 });
 
     const cam = Object.assign({ s: 1, lat: 44.1, lon: -120.55 }, cfg.cam || {});
     const xy = ([lon, lat]) => [CX + (lon - cam.lon) * KX * S * cam.s, CY - (lat - cam.lat) * S * cam.s];
