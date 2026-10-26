@@ -8,6 +8,7 @@
     A: { x: 120, y: 150, w: 320, h: 210, title: "경보 비밀번호", sub: "남편이 알고 있었다" },
     B: { x: 120, y: 560, w: 320, h: 150, title: "낮 경보 해제" },
     M: { x: 560, y: 150, w: 300, h: 310, photo: true, title: "마이크(남편)" },
+    M2: { x: 560, y: 150, w: 300, h: 350, photo: true, title: "마이크", sub: "수첩 메모 · 남편 이름" },
     H: { x: 1060, y: 150, w: 300, h: 310, photo: true, title: "해피" },
     C: { x: 1060, y: 580, w: 300, h: 150, title: "살인 공모 전과" },
     Q: { x: 1500, y: 420, w: 300, h: 310, photo: true, title: "옛 감방 동료", unknown: true },
@@ -121,7 +122,7 @@
     gsap.set(world, camXY(Object.assign({ s: 1, cx: 960, cy: 460 }, cfg.cam || {})));
 
     return {
-      world, els, cards: CARDS,
+      world, els, cards: CARDS, strSvg, pin,
       cam(tl, at, dur, c, ease = "power2.inOut") { tl.to(world, Object.assign(camXY(c), { duration: dur, ease }), at); },
       flipQ(tl, at) {
         tl.to(els.Q.front, { rotateY: -180, duration: 0.5, ease: "power2.inOut" }, at);

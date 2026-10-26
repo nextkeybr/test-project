@@ -1,7 +1,7 @@
-// B36 · L-B36_GFX_label_v1_장갑-분해라벨 · 오버레이 · 6초
+// B36 · L-B36_GFX_label_v2_장갑-분해라벨 · 오버레이 · 6초
 // 3D 손 분해 영상에 맞춰 라벨 위치를 다시 맞춰야 함(지금은 가운데 기준). 각 층에서 오른쪽으로 호출선
 window.CLIP = {
-  file: "L-B36_GFX_label_v1_장갑-분해라벨",
+  file: "L-B36_GFX_label_v2_장갑-분해라벨",
   format: "overlay",
   duration: 6,
   build(stage, tl) {
@@ -23,7 +23,6 @@ window.CLIP = {
     gsap.set(bottom, { xPercent: -50 });
     K.inUp(tl, bottom, 2.4);
     els.push(bottom);
-    K.out(tl, els, 5.7);
     K.hold(tl, 6);
   },
 };

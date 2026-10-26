@@ -1,6 +1,6 @@
-// B59 · L-B59_GFX_stamp_v1_전과-도장 · 오버레이 · 3초 · 해피 사진(RP-005) 위에 옐로우 도장이 쾅(0.8초, 살짝 흔들림 허용)
+// B59 · L-B59_GFX_stamp_v2_전과-도장 · 오버레이 · 3초 · 해피 사진(RP-005) 위에 옐로우 도장이 쾅(0.8초, 살짝 흔들림 허용)
 window.CLIP = {
-  file: "L-B59_GFX_stamp_v1_전과-도장",
+  file: "L-B59_GFX_stamp_v2_전과-도장",
   format: "overlay",
   duration: 3,
   holdFrom: 1.4,

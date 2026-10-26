@@ -1,7 +1,7 @@
-// B61 · L-B61_GFX_timeline-c_v1_2004-고용 · T12 · 오버레이 · 8초 (매장 일러스트 위 아래쪽 띠)
+// B61 · L-B61_GFX_timeline-c_v2_2004-고용 · T12 · 오버레이 · 8초 (매장 일러스트 위 아래쪽 띠)
 // B60 타임라인 오른쪽 끝에 점 "2004 · 남편이 청소원으로 고용" 추가(2.0초)
 window.CLIP = {
-  file: "L-B61_GFX_timeline-c_v1_2004-고용",
+  file: "L-B61_GFX_timeline-c_v2_2004-고용",
   format: "overlay",
   duration: 8,
   build(stage, tl) {
@@ -15,7 +15,6 @@ window.CLIP = {
     t.bar(null, X(1994), X(2003), "9년 복역");
     t.add({ x: X(2004), label: "2004 · 남편이 청소원으로 고용", at: 2.0, below: true, align: "right" });
     K.inUp(tl, band, 0.1, 0.4);
-    K.out(tl, band, 7.7);
     K.hold(tl, 8);
   },
 };

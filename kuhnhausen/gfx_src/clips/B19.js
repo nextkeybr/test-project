@@ -1,6 +1,6 @@
-// B19 · L-B19_GFX_card_v1_돈-금고-없음 · 풀프레임 · 3.5초(비트 7초 중 앞부분)
+// B19 · L-B19_GFX_card_v2_돈-금고-없음 · 풀프레임 · 3.5초(비트 7초 중 앞부분)
 window.CLIP = {
-  file: "L-B19_GFX_card_v1_돈-금고-없음",
+  file: "L-B19_GFX_card_v2_돈-금고-없음",
   format: "full",
   duration: 3.5,
   build(stage, tl) {

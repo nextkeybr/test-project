@@ -1,6 +1,6 @@
-// 공용 라벨 · L-LBL_GFX_label-d_v1_공식자료 · T05 · 오버레이 · 30초 (편집에서 잘라 씀, 퇴장 없음)
+// 공용 라벨 · L-LBL_GFX_label-d_v2_공식자료 · T05 · 오버레이 · 30초 (편집에서 잘라 씀, 퇴장 없음)
 window.CLIP = {
-  file: "L-LBL_GFX_label-d_v1_공식자료",
+  file: "L-LBL_GFX_label-d_v2_공식자료",
   format: "overlay",
   duration: 30,
   holdFrom: 0.5,

@@ -1,7 +1,7 @@
-// B31-b · L-B31_GFX_floorplan-d_v1_옆집-위치 · T02 · 풀프레임 · 3초
+// B31-b · L-B31_GFX_floorplan-d_v2_옆집-위치 · T02 · 풀프레임 · 3초
 // 줌아웃 → 오른쪽에 옆집 윤곽(화이트 점선)과 라벨 "옆집", 수전 점이 옆집으로 이동한 상태로 끝
 window.CLIP = {
-  file: "L-B31_GFX_floorplan-d_v1_옆집-위치",
+  file: "L-B31_GFX_floorplan-d_v2_옆집-위치",
   format: "full",
   duration: 3,
   build(stage, tl) {

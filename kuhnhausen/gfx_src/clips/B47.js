@@ -1,6 +1,6 @@
-// B47 · L-B47_GFX_bubble_v1_인정과-부인 · 오버레이 · 7초 (남편 사진 RP-004 옆) · 고정 라벨 "당사자 주장"
+// B47 · L-B47_GFX_bubble_v2_인정과-부인 · 오버레이 · 7초 (남편 사진 RP-004 옆) · 고정 라벨 "당사자 주장"
 window.CLIP = {
-  file: "L-B47_GFX_bubble_v1_인정과-부인",
+  file: "L-B47_GFX_bubble_v2_인정과-부인",
   format: "overlay",
   duration: 7,
   build(stage, tl) {
@@ -10,7 +10,6 @@ window.CLIP = {
     const b2 = K.bubble(stage, "그 남자는 안 들였다", { left: 1000, top: 470 }, "left");
     K.pop(tl, b1, 0.5, 0.4, 0.9);
     K.pop(tl, b2, 2.5, 0.4, 0.9);
-    K.out(tl, [lab, b1, b2], 6.7);
     K.hold(tl, 7);
   },
 };

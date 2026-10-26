@@ -1,7 +1,7 @@
-// B56 · L-B56_GFX_calendar-a_v1_9월6일-8일 · T12(달력) · 풀프레임 · 3초(비트 5초 중 앞부분)
+// B56 · L-B56_GFX_calendar-a_v2_9월6일-8일 · T12(달력) · 풀프레임 · 3초(비트 5초 중 앞부분)
 // 2006년 9월 달력, 6일 칸 옐로우 → 0.6초 간격으로 7일, 8일 → 8일에 "유서 남기고 사라짐"
 window.CLIP = {
-  file: "L-B56_GFX_calendar-a_v1_9월6일-8일",
+  file: "L-B56_GFX_calendar-a_v2_9월6일-8일",
   format: "full",
   duration: 3,
   build(stage, tl) {

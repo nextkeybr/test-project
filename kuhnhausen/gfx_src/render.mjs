@@ -1,5 +1,7 @@
 // 사용법: node render.mjs B04 B07 ... [--check] [--at=4.5,8.7]
 //   프레임을 PNG로 캡처 → ffmpeg로 묶음. 앞뒤 핸들 0.5초(15프레임)는 첫/끝 프레임 정지.
+//   본 길이 뒤에 끝 정지 꼬리 3초(90프레임)를 붙인다: 앞 핸들 + 본 길이 + 꼬리 3초 + 뒤 핸들
+//   나레이션에 맞춰 바뀌는 등장 시각은 timing.json 에 있다(window.TIMING 으로 주입)
 //   --check 는 검수용 프레임(0.6초, 가운데, 끝-0.6초)만 뽑는다.
 //   오버레이(.mov)는 확인용 미리보기 mp4(회색 바탕)를 _preview 폴더에 함께 만든다.
 //   이미 있는 출력 파일은 덮어쓰지 않고 건너뛴다(고치면 클립 파일의 버전을 올린다).
@@ -15,7 +17,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const ids = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 const checkOnly = process.argv.includes("--check");
 const extra = (process.argv.find((a) => a.startsWith("--at=")) || "").slice(5).split(",").filter(Boolean).map(Number);
-const FPS = 30, HANDLE = 15;
+const FPS = 30, HANDLE = 15, TAIL = 90;
 const outDir = path.resolve(here, "../40_gfx");
 const qcDir = path.join(outDir, "_qc");
 const pvDir = path.join(outDir, "_preview");
@@ -25,6 +27,8 @@ const ff = (args) => execFileSync("ffmpeg", ["-y", "-loglevel", "error", ...args
 const browser = await chromium.launch({ args: ["--allow-file-access-from-files"] });
 const page = await browser.newPage({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
 page.on("pageerror", (e) => console.error("페이지 오류:", e.message));
+const timing = fs.readFileSync(path.join(here, "timing.json"), "utf8");
+await page.addInitScript((json) => { window.TIMING = JSON.parse(json); }, timing);
 
 for (const id of ids) {
   await page.goto(`file://${here}/stage.html?clip=${id}`);
@@ -70,7 +74,7 @@ for (const id of ids) {
     }
     if (f === 0) for (let h = 0; h < HANDLE; h++) put(file);
     put(file);
-    if (f === bodyFrames - 1) for (let h = 0; h < HANDLE; h++) put(file);
+    if (f === bodyFrames - 1) for (let h = 0; h < TAIL + HANDLE; h++) put(file);
     last = file;
   }
   const seq = ["-framerate", String(FPS), "-i", path.join(tmp, "f%05d.png")];

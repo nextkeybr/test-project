@@ -1,0 +1,18 @@
+{
+  "_설명": "나레이션(TTS)에 맞춰 바꾸는 등장 시각(초, 각 클립 본 길이 기준). 값만 고치고 node render.mjs <클립> 으로 다시 뽑는다. 파일 버전은 클립 파일(clips/*.js)의 file 이름에서 올린다.",
+  "B02":   { "waveReveal": 0.0, "label": 1.2, "line1": 2.0 },
+  "B03":   { "line2": 2.0, "line3": 6.5 },
+  "B04":   { "line4": 1.0, "line5": 2.5, "underline": 4.6, "emphasis": 5.0, "waveStop": 9.5 },
+  "B31a":  { "tagFlip": 0.5, "fillWord": 1.2 },
+  "B37":   { "newLine": 0.5, "waveStop": 4.6 },
+  "B38a":  { "unblur": 0.5 },
+  "B60b1": { "point1991": 0.8 },
+  "B60b2": { "point1994": 0.6, "barStart": 1.6 },
+  "B60b3": { "point2003": 1.6, "barLabel": 2.4 },
+  "B66a":  { "sub": 0.5 },
+  "B66b":  { "big": 0.5, "sub": 1.2 },
+  "B76d1": { "sentence": 0.4, "zoom": 3.0 },
+  "B76d2": { "death": 0.6, "release": 1.4, "gap": 2.2 },
+  "B81":   { "quote": 0.4, "original": 1.4, "label": 1.8 },
+  "B82":   { "quote": 2.0, "original": 6.0, "label": 6.3, "fadeOut": 13.0 }
+}

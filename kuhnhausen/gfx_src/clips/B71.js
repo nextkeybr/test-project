@@ -1,6 +1,6 @@
-// B71 · L-B71_GFX_calendar-c_v1_출소예정일 · T12(달력) · 풀프레임 · 3초 · "2014년 9월 14일" + "출소 예정"
+// B71 · L-B71_GFX_calendar-c_v2_출소예정일 · T12(달력) · 풀프레임 · 3초 · "2014년 9월 14일" + "출소 예정"
 window.CLIP = {
-  file: "L-B71_GFX_calendar-c_v1_출소예정일",
+  file: "L-B71_GFX_calendar-c_v2_출소예정일",
   format: "full",
   duration: 3,
   build(stage, tl) {

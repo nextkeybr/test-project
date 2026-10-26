@@ -1,7 +1,7 @@
-// B58 · L-B58_GFX_bubble_v1_조사-진술변화 · 오버레이 · 7초 · 고정 라벨 "보도 인용"
+// B58 · L-B58_GFX_bubble_v2_조사-진술변화 · 오버레이 · 7초 · 고정 라벨 "보도 인용"
 // 말풍선 "모르는 사람이다" → 2.5초에 줄이 그어지고 새 말풍선
 window.CLIP = {
-  file: "L-B58_GFX_bubble_v1_조사-진술변화",
+  file: "L-B58_GFX_bubble_v2_조사-진술변화",
   format: "overlay",
   duration: 7,
   build(stage, tl) {
@@ -17,7 +17,6 @@ window.CLIP = {
     tl.to(b1, { opacity: 0.6, duration: 0.3 }, 2.85);
     const b2 = K.bubble(stage, "아는 사이일 뿐, 내가 한 게 아니다", { left: 880, top: 470 }, "left");
     K.pop(tl, b2, 3.0, 0.4, 0.9);
-    K.out(tl, [lab, b1, b2], 6.7);
     K.hold(tl, 7);
   },
 };

@@ -1,7 +1,7 @@
-// B65 · L-B65_GFX_compare_v1_보험과-집 · 풀프레임 · 12초
+// B65 · L-B65_GFX_compare_v2_보험과-집 · 풀프레임 · 12초
 // 좌우 두 칸 → 9.0초 화면 전체가 증거 보드로 줌아웃되며 모든 카드가 한 화면에. '동기'라는 단어는 쓰지 않는다
 window.CLIP = {
-  file: "L-B65_GFX_compare_v1_보험과-집",
+  file: "L-B65_GFX_compare_v2_보험과-집",
   format: "full",
   duration: 12,
   build(stage, tl) {

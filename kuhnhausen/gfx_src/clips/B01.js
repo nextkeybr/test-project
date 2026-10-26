@@ -1,6 +1,6 @@
-// B01 · L-B01_GFX_card_v1_날짜-장소 · T07 · 풀프레임 · 4초
+// B01 · L-B01_GFX_card_v2_날짜-장소 · T07 · 풀프레임 · 4초
 window.CLIP = {
-  file: "L-B01_GFX_card_v1_날짜-장소",
+  file: "L-B01_GFX_card_v2_날짜-장소",
   format: "full",
   duration: 4,
   build(stage, tl) {

@@ -1,8 +1,8 @@
-// B69 · L-B69_GFX_number_v1_105만-달러 · 풀프레임 · 8초
+// B69 · L-B69_GFX_number_v2_105만-달러 · 풀프레임 · 8초
 // 1.0~3.0초 숫자 카운트업(0 → 105만) → 4.0초 아래 문구 → 5.0초 오른쪽에 RD-006 기사 캡처 자리가 작게 슬라이드
 // RD-006 캡처가 아직 없어 빈 문서 틀(글자 없음)로 자리만 잡음. 캡처가 오면 v2
 window.CLIP = {
-  file: "L-B69_GFX_number_v1_105만-달러",
+  file: "L-B69_GFX_number_v2_105만-달러",
   format: "full",
   duration: 8,
   build(stage, tl) {

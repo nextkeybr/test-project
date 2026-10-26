@@ -1,7 +1,7 @@
-// B63 · L-B63_GFX_board-f_v1_감방동료-공개 · T04 · 풀프레임 · 5초
+// B63 · L-B63_GFX_board-f_v2_감방동료-공개 · T04 · 풀프레임 · 5초
 // "?" 카드가 0.5초에 뒤집힘 → "옛 감방 동료"(사진 없음, 회색 실루엣) → 2.0초 "마이크(남편)", "해피" 카드로 레드 실 두 줄
 window.CLIP = {
-  file: "L-B63_GFX_board-f_v1_감방동료-공개",
+  file: "L-B63_GFX_board-f_v2_감방동료-공개",
   format: "full",
   duration: 5,
   build(stage, tl) {

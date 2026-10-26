@@ -1,7 +1,7 @@
-// B14-a · L-B14_GFX_floorplan-a_v1_평면도-등장 · T02 · 풀프레임 · 4초
+// B14-a · L-B14_GFX_floorplan-a_v2_평면도-등장 · T02 · 풀프레임 · 4초
 // 침입자의 이름은 B33 전까지 쓰지 않는다 → '남자'
 window.CLIP = {
-  file: "L-B14_GFX_floorplan-a_v1_평면도-등장",
+  file: "L-B14_GFX_floorplan-a_v2_평면도-등장",
   format: "full",
   duration: 4,
   build(stage, tl) {

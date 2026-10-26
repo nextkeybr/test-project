@@ -1,10 +1,11 @@
-// B31-a · L-B31_GFX_card-a_v1_911카드-신고자공개 · T01 · 풀프레임 · 3초
+// B31-a · L-B31_GFX_card-a_v2_911카드-신고자공개 · T01 · 풀프레임 · 3초 (등장 시각: timing.json "B31a")
 window.CLIP = {
-  file: "L-B31_GFX_card-a_v1_911카드-신고자공개",
+  file: "L-B31_GFX_card-a_v2_911카드-신고자공개",
   format: "full",
   duration: 3,
   build(stage, tl) {
     // B02의 첫 줄 상태로 시작
+    const T = window.TIMING.B31a;
     const card = buildT01(stage, tl, {
       label: "911 녹취록 · 보도 인용",
       lines: [{ speaker: "신고자", text: "…침입자가 있어요.", state: "shown" }],
@@ -20,8 +21,8 @@ window.CLIP = {
     row.appendChild(tag2);
     gsap.set([tag, tag2], { transformPerspective: 500 });
     gsap.set(tag2, { rotateX: -90 });
-    tl.to(tag, { rotateX: 90, duration: 0.16, ease: "power2.in" }, 0.5);
-    tl.to(tag2, { rotateX: 0, duration: 0.2, ease: "power2.out" }, 0.66);
+    tl.to(tag, { rotateX: 90, duration: 0.16, ease: "power2.in" }, T.tagFlip);
+    tl.to(tag2, { rotateX: 0, duration: 0.2, ease: "power2.out" }, T.tagFlip + 0.16);
 
     // 1.2초: 말줄임표 자리에 '옆집에'가 채워져 "옆집에 침입자가 있어요."
     txt.textContent = "";
@@ -38,8 +39,8 @@ window.CLIP = {
     const w1 = ell.getBoundingClientRect().width, w2 = ins.getBoundingClientRect().width;
     gsap.set(ell, { width: w1 });
     gsap.set(ins, { width: 0 });
-    tl.to(ell, { width: 0, opacity: 0, duration: 0.25, ease: "power2.in" }, 1.2);
-    tl.to(ins, { width: w2, duration: 0.5, ease: "power3.out" }, 1.3);
+    tl.to(ell, { width: 0, opacity: 0, duration: 0.25, ease: "power2.in" }, T.fillWord);
+    tl.to(ins, { width: w2, duration: 0.5, ease: "power3.out" }, T.fillWord + 0.1);
     K.hold(tl, 3);
     return (t) => card.wave.draw(t);
   },

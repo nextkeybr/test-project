@@ -1,7 +1,7 @@
-// B21 · L-B21_GFX_floorplan-b_v1_침실에서-복도로 · T02 · 풀프레임 · 6초
+// B21 · L-B21_GFX_floorplan-b_v2_침실에서-복도로 · T02 · 풀프레임 · 6초
 // 침실 줌 상태 → 1.0초 수전 점이 침실 문 쪽으로(옐로우 경로선) → 3.0초 복도로 나감 → 4.0초 줌아웃해 집 전체
 window.CLIP = {
-  file: "L-B21_GFX_floorplan-b_v1_침실에서-복도로",
+  file: "L-B21_GFX_floorplan-b_v2_침실에서-복도로",
   format: "full",
   duration: 6,
   build(stage, tl) {

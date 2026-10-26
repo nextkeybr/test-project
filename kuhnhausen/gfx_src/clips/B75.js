@@ -1,8 +1,8 @@
-// B75 · L-B75_GFX_countdown_v1_멈춘-카운트다운 · 오버레이 · 8초 (교도소 외관 위)
+// B75 · L-B75_GFX_countdown_v2_멈춘-카운트다운 · 오버레이 · 8초 (교도소 외관 위)
 // 오른쪽 위 "출소까지" + "약 석 달". 0~4초 테두리가 째깍거리듯 깜빡 → 5.0초 멈추고 테두리 화이트 → 회색(화이트 40%)
 // 일수 숫자는 쓰지 않는다
 window.CLIP = {
-  file: "L-B75_GFX_countdown_v1_멈춘-카운트다운",
+  file: "L-B75_GFX_countdown_v2_멈춘-카운트다운",
   format: "overlay",
   duration: 8,
   holdFrom: 5.4,

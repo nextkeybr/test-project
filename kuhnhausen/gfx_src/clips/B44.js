@@ -1,7 +1,7 @@
-// B44 · L-B44_GFX_map-b_v1_밤-귀환 · T11 · 풀프레임 · 4초
+// B44 · L-B44_GFX_map-b_v2_밤-귀환 · T11 · 풀프레임 · 4초
 // B43 끝 상태에서 같은 길을 되짚어 오는 옐로우 점선 → 포틀랜드 점 깜빡 + "그날 밤 포틀랜드로"
 window.CLIP = {
-  file: "L-B44_GFX_map-b_v1_밤-귀환",
+  file: "L-B44_GFX_map-b_v2_밤-귀환",
   format: "full",
   duration: 4,
   build(stage, tl) {

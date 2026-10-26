@@ -1,9 +1,9 @@
-// B35 · L-B35_GFX_doc_v1_강도처럼-보이게 · T09 · 풀프레임 · 8초
+// B35 · L-B35_GFX_doc_v2_강도처럼-보이게 · T09 · 풀프레임 · 9초
 // RD-003 캡처가 아직 없어 문장만 카드로(형광펜 없이). 시작 0.2초 노이즈 글리치(이 클립만 허용)
 window.CLIP = {
-  file: "L-B35_GFX_doc_v1_강도처럼-보이게",
+  file: "L-B35_GFX_doc_v2_강도처럼-보이게",
   format: "full",
-  duration: 8,
+  duration: 9,
   build(stage, tl) {
     const d = buildT09(stage, tl, {
       paperAt: 0,

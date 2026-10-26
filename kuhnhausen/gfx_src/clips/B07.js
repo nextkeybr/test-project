@@ -1,6 +1,6 @@
-// B07 · L-B07_GFX_card_v1_수전-인물카드 · T06 · 오버레이 · 7초
+// B07 · L-B07_GFX_card_v2_수전-인물카드 · T06 · 오버레이 · 7초
 window.CLIP = {
-  file: "L-B07_GFX_card_v1_수전-인물카드",
+  file: "L-B07_GFX_card_v2_수전-인물카드",
   format: "overlay",
   duration: 7,
   build(stage, tl) {

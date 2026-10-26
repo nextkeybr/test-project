@@ -1,8 +1,8 @@
-// B28 · L-B28_GFX_floorplan-c_v1_전체동선-14분 · T02 · 풀프레임 · 5초
+// B28 · L-B28_GFX_floorplan-c_v2_전체동선-14분 · T02 · 풀프레임 · 5초
 // 집 전체. 침실 → 복도 동선을 옐로우 선으로 한 번에. 위쪽 가로 막대가 차오르고 끝에 "약 14분"
 // 초 단위로 흐르는 시계 숫자는 쓰지 않는다
 window.CLIP = {
-  file: "L-B28_GFX_floorplan-c_v1_전체동선-14분",
+  file: "L-B28_GFX_floorplan-c_v2_전체동선-14분",
   format: "full",
   duration: 5,
   build(stage, tl) {

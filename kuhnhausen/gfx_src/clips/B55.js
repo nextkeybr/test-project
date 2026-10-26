@@ -1,7 +1,7 @@
-// B55 · L-B55_GFX_board-c_v1_빨간실-연결 · T04 · 풀프레임 · 6초
+// B55 · L-B55_GFX_board-c_v2_빨간실-연결 · T04 · 풀프레임 · 6초
 // 카드 두 장(사진 자리: RP-004, RP-005 — 사진이 아직 없어 회색 실루엣) → 1.5초 레드 실 + "고용: 청소원" → 4.0초 보드 전체로 줌아웃
 window.CLIP = {
-  file: "L-B55_GFX_board-c_v1_빨간실-연결",
+  file: "L-B55_GFX_board-c_v2_빨간실-연결",
   format: "full",
   duration: 6,
   build(stage, tl) {

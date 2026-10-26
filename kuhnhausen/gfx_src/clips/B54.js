@@ -1,7 +1,7 @@
-// B54 · L-B54_GFX_diagram_v1_배낭-물건 · 풀프레임 · 6초
+// B54 · L-B54_GFX_diagram_v2_배낭-물건 · 풀프레임 · 6초
 // 위에서 내려다본 배낭과 물건 아이콘(화이트 선 그림) → 3.5초 "서류 봉투"만 옐로우 + "새 휴대전화 번호"와 흐린 숫자 자리
 window.CLIP = {
-  file: "L-B54_GFX_diagram_v1_배낭-물건",
+  file: "L-B54_GFX_diagram_v2_배낭-물건",
   format: "full",
   duration: 6,
   build(stage, tl) {

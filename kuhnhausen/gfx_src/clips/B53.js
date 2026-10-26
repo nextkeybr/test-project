@@ -1,6 +1,6 @@
-// B53 · L-B53_GFX_card_v1_남편-인물카드 · T06 · 오버레이 · 4초
+// B53 · L-B53_GFX_card_v2_남편-인물카드 · T06 · 오버레이 · 4초
 window.CLIP = {
-  file: "L-B53_GFX_card_v1_남편-인물카드",
+  file: "L-B53_GFX_card_v2_남편-인물카드",
   format: "overlay",
   duration: 4,
   build(stage, tl) {

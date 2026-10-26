@@ -1,7 +1,7 @@
-// B17 · L-B17_GFX_diagram_v1_왼쪽-관자놀이 · 오버레이 · 3초
+// B17 · L-B17_GFX_diagram_v2_왼쪽-관자놀이 · 오버레이 · 3초
 // 정면 머리 실루엣(화이트 선, 윤곽만). 본인의 왼쪽 관자놀이 = 정면에서 보면 화면 오른쪽. 피 표현 없이 점과 파동만
 window.CLIP = {
-  file: "L-B17_GFX_diagram_v1_왼쪽-관자놀이",
+  file: "L-B17_GFX_diagram_v2_왼쪽-관자놀이",
   format: "overlay",
   duration: 3,
   build(stage, tl) {
@@ -29,7 +29,6 @@ window.CLIP = {
     gsap.set(lab, { x: 0 });
     lab.style.left = "1612px";
     K.inUp(tl, lab, 1.1, 0.35);
-    K.out(tl, [svg, lab], 2.72);
     K.hold(tl, 3);
   },
 };

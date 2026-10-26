@@ -2,7 +2,9 @@
 // buildT01(stage, tl, cfg) -> { lines, wave }
 //   cfg.label      오른쪽 위 라벨 문구
 //   cfg.lines      [{ speaker, text, at, state }]  state: 'shown'(시작부터 보임) | undefined(at 초에 등장)
-//   cfg.speech     [[시작, 끝], ...]  파형이 말소리처럼 커지는 구간(초)
+//   cfg.speech     [[시작, 끝], ...]  파형이 말소리처럼 커지는 구간(초). 없으면 대사 줄 시각으로 자동
+//   cfg.extraSpeech 자동 구간에 더할 구간(앞 클립에서 이어지는 말소리 등)
+//   cfg.wave       {w, h, y} 파형 크기·위치 (기본 1200 × 150, y 110)
 //   cfg.flatAt     파형이 뚝 멈추는 시각(초). 없으면 끝까지 움직임
 //   cfg.dimOld     새 줄이 생길 때 윗줄 투명도 (기본 0.6)
 //   cfg.labelAt    라벨 등장 시각(없으면 처음부터 보임)
@@ -10,20 +12,24 @@
 //   cfg.top        대화 줄 시작 y (기본 340)
 //   line.blur      true면 글자를 흐리게(읽을 수 없게), line.unblurAt 에 걷힘
 (function () {
-  const WAVE_W = 1200, WAVE_H = 150, WAVE_Y = 110;
-  const BAR_W = 4, BAR_GAP = 4, BARS = WAVE_W / (BAR_W + BAR_GAP);
-  const PX_PER_SEC = (BAR_W + BAR_GAP) * 30; // 한 프레임에 막대 하나씩 흐름
+  const BAR_W = 4, BAR_GAP = 4;
 
   // 시간에 대해 결정적인 난수(같은 t면 같은 그림)
   function hash(n) { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); }
 
   function makeWave(stage, cfg) {
+    // 기본 크기: 가로 1200, 높이 150, 위치 y 110. cfg.wave {w, h, y} 로 바꿀 수 있다(파형 클로즈업)
+    const WAVE_W = cfg.wave?.w ?? 1200, WAVE_H = cfg.wave?.h ?? 150, WAVE_Y = cfg.wave?.y ?? 110;
+    const BARS = Math.floor(WAVE_W / (BAR_W + BAR_GAP));
     const cv = document.createElement("canvas");
     cv.width = WAVE_W; cv.height = WAVE_H;
     Object.assign(cv.style, { position: "absolute", left: (1920 - WAVE_W) / 2 + "px", top: WAVE_Y + "px" });
     stage.appendChild(cv);
     const ctx = cv.getContext("2d");
-    const speech = cfg.speech || [];
+    // 말소리 구간: cfg.speech 가 없으면 대사 줄 등장 시각과 글자 수로 자동 계산(timing.json 값만 바꿔도 파형이 따라감)
+    const speech = (cfg.speech || []).concat(cfg.speech ? [] : (cfg.lines || []).filter((l) => l.at != null)
+      .map((l) => [l.at, l.at + Math.max(0.9, [...l.text].length * 0.085)]))
+      .concat(cfg.extraSpeech || []);
     const flatAt = cfg.flatAt ?? Infinity;
 
     // τ 시점의 말소리 세기(0~1). 구간 가장자리는 부드럽게.

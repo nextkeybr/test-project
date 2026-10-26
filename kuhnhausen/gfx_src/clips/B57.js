@@ -1,6 +1,6 @@
-// B57 · L-B57_GFX_calendar-b_v1_9월13일 · T12(달력) · 풀프레임 · 3초 · 8일에서 13일까지 빠르게 → 13일 "발견 · 체포"
+// B57 · L-B57_GFX_calendar-b_v2_9월13일 · T12(달력) · 풀프레임 · 3초 · 8일에서 13일까지 빠르게 → 13일 "발견 · 체포"
 window.CLIP = {
-  file: "L-B57_GFX_calendar-b_v1_9월13일",
+  file: "L-B57_GFX_calendar-b_v2_9월13일",
   format: "full",
   duration: 3,
   build(stage, tl) {

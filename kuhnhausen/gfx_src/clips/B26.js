@@ -1,7 +1,7 @@
-// B26 · L-B26_GFX_card_v1_신분증 · 오버레이 · 6초
+// B26 · L-B26_GFX_card_v2_신분증 · 오버레이 · 6초
 // 첫 카드(B25)는 그대로 두고 두 번째 카드 "신분증" + "침대 밑", "서랍장" 두 방향 옐로우 점선 화살표
 window.CLIP = {
-  file: "L-B26_GFX_card_v1_신분증",
+  file: "L-B26_GFX_card_v2_신분증",
   format: "overlay",
   duration: 6,
   build(stage, tl) {
@@ -26,7 +26,6 @@ window.CLIP = {
       K.inUp(tl, l, 1.8 + i * 0.25);
       return l;
     });
-    K.out(tl, [c1, c2, svg, ...labs], 5.7);
     K.hold(tl, 6);
   },
 };

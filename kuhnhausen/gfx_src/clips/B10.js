@@ -1,7 +1,7 @@
-// B10 · L-B10_GFX_label_v1_별거-1년째 · 오버레이 · 4초 (부부 사진 RP-006 위)
+// B10 · L-B10_GFX_label_v2_별거-1년째 · 오버레이 · 4초 (부부 사진 RP-006 위)
 // 화면 가운데를 세로로 가르는 금(화이트, 1.5초 동안 위에서 아래로). 말자막 자리(y 880~) 앞에서 옅어지며 끝남
 window.CLIP = {
-  file: "L-B10_GFX_label_v1_별거-1년째",
+  file: "L-B10_GFX_label_v2_별거-1년째",
   format: "overlay",
   duration: 4,
   build(stage, tl) {
@@ -19,7 +19,6 @@ window.CLIP = {
     K.draw(tl, crack, 0.2, 1.5, "power1.in");
     const lab = K.label(stage, "별거 1년째", { left: 80, top: 760 }, "big");
     K.inUp(tl, lab, 0.4);
-    K.out(tl, [svg, lab], 3.7);
     K.hold(tl, 4);
   },
 };
