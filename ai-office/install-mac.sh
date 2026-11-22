@@ -24,14 +24,8 @@ SRC="$(find "$TMP" -maxdepth 2 -type d -name ai-office | head -1)"
 if [ -z "$SRC" ]; then echo "❌ 받은 파일에서 ai-office 폴더를 찾지 못했습니다."; exit 1; fi
 
 mkdir -p "$DEST"
-rsync -a \
-  --exclude 'data/' --exclude 'shared/' --exclude 'agents.local.json' \
-  --exclude 'public/characters/' --exclude 'public/office-bg.*' \
-  --exclude 'agents/*/inbox/' --exclude 'agents/*/done/' --exclude 'agents/*/output/' \
-  --exclude 'agents/*/shared/' --exclude 'agents/*/role.local.md' \
-  "$SRC/" "$DEST/"
-mkdir -p "$DEST/public/characters"
-cp "$SRC/public/characters/README.md" "$DEST/public/characters/README.md"
+# 받은 파일에는 내 데이터가 들어있지 않으므로, 그대로 덮어써도 내 데이터는 남습니다
+cp -R "$SRC/." "$DEST/"
 echo "✅ 파일 설치 완료: $DEST (버전 $(cat "$DEST/VERSION" 2>/dev/null))"
 
 # 바탕화면 실행 아이콘 만들기 (내 컴퓨터에서 만든 파일이라 보안 경고가 뜨지 않습니다)
