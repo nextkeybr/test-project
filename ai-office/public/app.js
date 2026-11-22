@@ -14,8 +14,10 @@ function avatar(a, work) {
 }
 
 async function api(url, body) {
-  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
-  return r.json();
+  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Office': '1' }, body: JSON.stringify(body || {}) });
+  const j = await r.json().catch(() => ({}));
+  if (j.error) toast(j.error);
+  return j;
 }
 
 // ---------- 사무실 장면 ----------
@@ -169,7 +171,12 @@ async function init() {
   renderStaff(); renderChat(); renderFiles(); renderConsole(true);
   setInterval(idleChatter, 4500);
 
+  checkVersion();
   const es = new EventSource('/api/events');
+  // 서버가 다시 켜지면(업데이트 등) 화면을 자동으로 새로고침
+  let lost = false;
+  es.onerror = () => { lost = true; };
+  es.onopen = () => { if (lost) location.reload(); };
   es.addEventListener('agent', (ev) => {
     const a = JSON.parse(ev.data);
     S.agents[a.id] = a;
@@ -227,7 +234,7 @@ function toast(msg) {
 }
 async function uploadImage(id, file, work) {
   if (!file || !/^image\/(png|webp|gif|jpeg)$/.test(file.type)) return toast('png, jpg, webp, gif 이미지만 넣을 수 있어요');
-  const r = await fetch(`/api/agent/${id}/image${work ? '?work=1' : ''}`, { method: 'POST', headers: { 'Content-Type': file.type }, body: file });
+  const r = await fetch(`/api/agent/${id}/image${work ? '?work=1' : ''}`, { method: 'POST', headers: { 'Content-Type': file.type, 'X-Office': '1' }, body: file });
   const j = await r.json();
   if (j.error) return toast(j.error);
   if (els[id]) els[id].imgKey = '';
@@ -253,8 +260,8 @@ $('#cImg').addEventListener('click', (e) => {
     ['일할 때 모습 이미지 고르기 (선택)', () => { pickTarget = { id, work: true }; $('#imgPick').click(); }],
   ];
   if (a.image || a.workImage) items.push(['원래 캐릭터로 되돌리기', async () => {
-    await fetch(`/api/agent/${id}/image`, { method: 'DELETE' });
-    await fetch(`/api/agent/${id}/image?work=1`, { method: 'DELETE' });
+    await fetch(`/api/agent/${id}/image`, { method: 'DELETE', headers: { 'X-Office': '1' } });
+    await fetch(`/api/agent/${id}/image?work=1`, { method: 'DELETE', headers: { 'X-Office': '1' } });
     if (els[id]) els[id].imgKey = '';
     toast('원래 캐릭터로 되돌렸어요');
   }]);
@@ -294,6 +301,28 @@ document.addEventListener('drop', (e) => {
   if (!f) return;
   if (!id) return toast('직원 목록이나 캐릭터 위에 놓아 주세요');
   uploadImage(id, f, e.shiftKey);
+});
+
+// ---------- 업데이트 ----------
+async function checkVersion() {
+  try {
+    const v = await (await fetch('/api/version')).json();
+    const b = $('#updBtn');
+    b.title = `현재 버전 ${v.current}`;
+    if (v.latest && v.latest !== v.current && v.canUpdate) {
+      b.classList.remove('hidden');
+      b.textContent = '✨ 새 버전 업데이트';
+    }
+  } catch {}
+}
+$('#updBtn').addEventListener('click', async () => {
+  if (!confirm('새 버전으로 업데이트할까요?\n채팅 기록, 결과물, 캐릭터 이미지는 그대로 남아요.')) return;
+  const b = $('#updBtn');
+  b.disabled = true;
+  b.textContent = '업데이트 중...';
+  const j = await api('/api/update');
+  if (j.error) { b.disabled = false; b.textContent = '✨ 새 버전 업데이트'; return; }
+  b.textContent = '다시 여는 중...';
 });
 
 init();

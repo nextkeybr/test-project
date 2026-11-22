@@ -17,51 +17,41 @@ AI 직원 6명이 귀여운 사무실에서 실제로 일하는 개인용 대시
 ## 1. 처음 한 번만 준비하기
 
 1. **Node.js 설치**: https://nodejs.org 에서 LTS 버전을 받아 설치합니다.
-2. **AI 프로그램 3개 설치**: 터미널(맥) 또는 명령 프롬프트(윈도우)에 한 줄씩 입력합니다.
+2. **AI 프로그램 설치·로그인**: 터미널에 한 줄씩 입력합니다.
 
 ```bash
-npm install -g @anthropic-ai/claude-code
+curl -fsSL https://claude.ai/install.sh | bash
 ```
 
 ```bash
 npm install -g @openai/codex
 ```
 
-```bash
-npm install -g @google/gemini-cli
-```
+3. 터미널을 껐다 켠 뒤 `claude` 와 `codex` 를 한 번씩 실행해서 로그인합니다.
 
-3. **각 프로그램에 로그인**: 아래 명령을 하나씩 실행하고, 화면 안내대로 로그인한 뒤 종료합니다.
+> Claude는 Pro/Max 구독, Codex는 ChatGPT 유료 구독으로 쓸 수 있습니다.
 
-```bash
-claude
-```
+## 2. 설치하기 (맥) — 한 줄이면 끝
+
+터미널에 아래 한 줄을 붙여넣고 Enter:
 
 ```bash
-codex
+curl -fsSL https://raw.githubusercontent.com/nextkeybr/test-project/claude/ecstatic-lovelace-echyjs/ai-office/install-mac.sh | bash
 ```
 
-```bash
-gemini
-```
+- 내 컴퓨터의 `AI-Office` 폴더(홈 폴더 안)에 설치되고, **바탕화면에 `AI오피스` 아이콘**이 생깁니다.
+- 앞으로는 **바탕화면 아이콘 더블클릭**으로 켜면 됩니다. 브라우저가 자동으로 열립니다.
+- 끌 때는 뜬 터미널 창을 닫거나 Ctrl + C.
 
-> Claude는 Pro/Max 구독, Codex는 ChatGPT 유료 구독, Gemini는 구글 계정으로 쓸 수 있습니다. 무료 한도와 요금은 자주 바뀌니 각 서비스에서 확인하세요.
-
-## 2. 실행하기
-
-- **윈도우**: `실행-윈도우.bat` 더블클릭
-- **맥**: `실행-맥.command` 더블클릭 (처음에 막히면: 우클릭 → 열기)
-- 또는 이 폴더에서 `npm start`
-
-브라우저에서 http://localhost:3939 이 열립니다.
+### 업데이트
+새 버전이 나오면 사무실 화면 왼쪽 위에 **✨ 새 버전 업데이트** 버튼이 나타납니다. 누르면 자동으로 받고 다시 열립니다.
+채팅 기록, 결과물, 캐릭터 이미지, 내 설정은 그대로 남습니다.
 
 ### AI 없이 먼저 구경하기 (연습 모드)
+`AI-Office` 폴더에서 `npm run demo`. 가짜 직원들이 일하는 흐름을 보여줍니다. 비용이 들지 않습니다.
 
-```bash
-npm run demo
-```
-
-또는 `연습모드-윈도우.bat` / `연습모드-맥.command` 더블클릭. 가짜 직원들이 일하는 흐름을 보여줍니다. 비용이 들지 않습니다.
+### 윈도우
+ZIP으로 받아 `실행-윈도우.bat` 를 더블클릭합니다 (자동 업데이트는 맥만 지원).
 
 ## 3. 사용 방법
 
@@ -91,11 +81,22 @@ npm run demo
 
 > ⚠️ 치이카와 같은 기존 캐릭터 이미지는 **혼자 보는 용도로만** 쓰세요. 스크린샷·영상으로 공개하거나 배포하면 저작권 문제가 생길 수 있습니다. 이 폴더의 이미지는 git에 올라가지 않게 해두었습니다.
 
-## 5. 직원 바꾸기
+## 5. 직원 바꾸기 (업데이트해도 안 지워지는 방법)
 
-- **성격·업무 규칙**: `agents/<직원id>/role.md` 를 고칩니다. (CLAUDE.md, AGENTS.md, GEMINI.md는 실행할 때 자동으로 만들어지니 고치지 마세요)
-- **AI 바꾸기**: `agents.json` 에서 `"engine"` 을 `claude` / `codex` / `gemini` 중 하나로 바꿉니다.
-- **이름·캐릭터 모양**: `agents.json` 의 `name`, `nickname`, `character.type` (bunny, bear, cat, dog, hamster, chick)
+- **성격·업무 규칙**: `agents/<직원id>/role.md` 를 복사해서 같은 폴더에 `role.local.md` 로 저장한 뒤 그 파일을 고칩니다.
+- **이름·AI·캐릭터 모양**: `AI-Office` 폴더에 `agents.local.json` 을 만들고 바꿀 것만 적습니다. 예:
+
+```json
+{
+  "agents": [
+    { "id": "secretary", "nickname": "치이카와" },
+    { "id": "marketer", "engine": "claude" }
+  ]
+}
+```
+
+- `engine` 은 `claude` / `codex` 중 하나, `character.type` 은 bunny, bear, cat, dog, hamster, chick 중 하나입니다.
+- `agents.json`, `role.md` 를 직접 고치면 업데이트 때 덮어써집니다.
 
 ## 6. 디자이너에게 이미지 생성 도구 연결하기 (선택)
 
@@ -103,16 +104,17 @@ npm run demo
 
 1. `agents/designer` 폴더에서 Claude Code에 이미지 생성 MCP를 추가합니다 (`claude mcp add ...` — 방법은 각 서비스 문서 참고).
 2. 그 폴더에서 `claude` 를 한 번 실행해 도구 사용을 승인합니다.
-3. `agents.json` 의 디자이너 `extraArgs` 에 도구 허용을 넣습니다. 예: `["--allowedTools", "mcp__도구이름"]`
+3. `agents.local.json` 에 도구 허용을 넣습니다. 예: `{ "agents": [ { "id": "designer", "allowTools": ["mcp__도구이름"] } ] }`
 
 > 이 부분은 서비스마다 방법이 달라 직접 확인이 필요합니다.
 
 ## 7. 안전 수칙
 
-- 이 서버는 **내 컴퓨터에서만** 열립니다 (localhost). 다른 기기에서 접속되지 않습니다.
+- 이 서버는 **내 컴퓨터에서만** 열립니다 (localhost). 다른 기기나 다른 웹사이트에서 직원에게 지시할 수 없게 막아두었습니다.
+- Claude 직원은 허용된 도구(파일 읽기·쓰기, 웹 검색, 일부 명령)만 쓸 수 있고, 나머지는 자동으로 건너뜁니다.
 - 직원들은 자기 폴더(`agents/<id>/`) 안에서만 파일을 만들도록 되어 있습니다.
 - 메일 발송, SNS 게시, 배포 같은 바깥으로 나가는 일은 하지 않고 보고만 하도록 역할 설명서에 적어두었습니다.
-- 직원을 많이 동시에 돌리면 사용량 한도를 빨리 씁니다. `agents.json` 의 `maxParallel`(동시에 일하는 인원, 기본 3)으로 조절하세요.
+- 직원을 많이 동시에 돌리면 사용량 한도를 빨리 씁니다. `agents.local.json` 의 `settings.maxParallel`(동시에 일하는 인원, 기본 3)으로 조절하세요.
 
 ## 8. 문제가 생기면
 
@@ -120,5 +122,5 @@ npm run demo
 |---|---|
 | "프로그램을 찾을 수 없습니다" | 1단계 설치를 다시 하고, 터미널을 껐다 켜세요 |
 | 직원이 오류로 끝남 | 아래 터미널 창의 기록을 확인. 대부분 로그인이 풀린 경우입니다 (1단계 3번) |
-| 옵션 오류 (unknown option 등) | AI 프로그램 버전마다 옵션이 다를 수 있습니다. `agents.json` 의 `engines` → `args` 를 고치세요 |
-| 포트가 이미 사용 중 | `agents.json` 의 `port` 를 3940 등으로 바꾸세요 |
+| 옵션 오류 (unknown option 등) | AI 프로그램 버전마다 옵션이 다를 수 있습니다. 알려주시면 고쳐서 업데이트로 보내드립니다 |
+| "이미 켜져 있어요" | 사무실이 이미 켜져 있는 상태입니다. 브라우저에서 http://localhost:3939 를 여세요 |

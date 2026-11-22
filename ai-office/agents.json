@@ -17,7 +17,7 @@
     "codex": {
       "label": "Codex CLI",
       "cmd": "codex",
-      "args": ["exec", "--full-auto", "--skip-git-repo-check", "--output-last-message", "{RESULT_FILE}", "{PROMPT}"],
+      "args": ["--search", "exec", "--sandbox", "workspace-write", "--skip-git-repo-check", "--output-last-message", "{RESULT_FILE}", "{PROMPT}"],
       "parser": "text",
       "resultFromFile": true,
       "roleFile": "AGENTS.md"
@@ -41,6 +41,7 @@
       "character": { "type": "bunny", "color": "#ffffff", "accent": "#ffb3c7" },
       "desk": { "x": 46, "y": 42 },
       "rest": { "x": 11, "y": 47 },
+      "allowTools": [],
       "extraArgs": []
     },
     {
@@ -53,6 +54,7 @@
       "character": { "type": "bear", "color": "#f3dcc0", "accent": "#ff9fb2" },
       "desk": { "x": 63, "y": 42 },
       "rest": { "x": 17.5, "y": 47 },
+      "allowTools": [],
       "extraArgs": []
     },
     {
@@ -65,6 +67,7 @@
       "character": { "type": "dog", "color": "#fff7ec", "accent": "#ffb08a" },
       "desk": { "x": 80, "y": 42 },
       "rest": { "x": 24, "y": 47 },
+      "allowTools": [],
       "extraArgs": []
     },
     {
@@ -77,6 +80,7 @@
       "character": { "type": "cat", "color": "#ffffff", "accent": "#ffb3c7" },
       "desk": { "x": 46, "y": 74 },
       "rest": { "x": 8, "y": 80 },
+      "allowTools": [],
       "extraArgs": []
     },
     {
@@ -89,6 +93,7 @@
       "character": { "type": "hamster", "color": "#fffaf3", "accent": "#e8b27a" },
       "desk": { "x": 63, "y": 74 },
       "rest": { "x": 27, "y": 80 },
+      "allowTools": [],
       "extraArgs": []
     },
     {
@@ -101,6 +106,7 @@
       "character": { "type": "chick", "color": "#fff1a8", "accent": "#ffb3a0" },
       "desk": { "x": 80, "y": 74 },
       "rest": { "x": 41, "y": 27 },
+      "allowTools": [],
       "extraArgs": []
     }
   ]

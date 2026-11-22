@@ -7,7 +7,21 @@ const path = require('path');
 const { spawn } = require('child_process');
 
 const ROOT = __dirname;
+// agents.json = 기본 설정 (업데이트로 바뀜). agents.local.json = 내 설정 (업데이트해도 안 바뀜)
 const CFG = JSON.parse(fs.readFileSync(path.join(ROOT, 'agents.json'), 'utf8'));
+try {
+  const local = JSON.parse(fs.readFileSync(path.join(ROOT, 'agents.local.json'), 'utf8'));
+  Object.assign(CFG.settings, local.settings || {});
+  for (const [k, v] of Object.entries(local.engines || {})) CFG.engines[k] = { ...(CFG.engines[k] || {}), ...v };
+  for (const la of local.agents || []) {
+    const base = CFG.agents.find((x) => x.id === la.id);
+    if (base) Object.assign(base, la); else CFG.agents.push(la);
+  }
+} catch (e) {
+  if (e.code !== 'ENOENT') console.log('⚠️ agents.local.json 을 읽지 못했습니다 (쉼표·따옴표 확인):', e.message);
+}
+const VERSION = (() => { try { return fs.readFileSync(path.join(ROOT, 'VERSION'), 'utf8').trim(); } catch { return 'dev'; } })();
+const REPO_RAW = 'https://raw.githubusercontent.com/nextkeybr/test-project/claude/ecstatic-lovelace-echyjs/ai-office';
 const SET = CFG.settings;
 const MOCK = process.env.OFFICE_MOCK === '1' || process.argv.includes('--mock');
 const PORT = Number(process.env.PORT) || SET.port || 3939;
@@ -27,8 +41,8 @@ const order = [];
 for (const a of CFG.agents) {
   const dir = path.join(AGENTS_DIR, a.id);
   for (const sub of ['inbox', 'done', 'output', 'shared']) fs.mkdirSync(path.join(dir, sub), { recursive: true });
-  // role.md(원본) → 엔진별 설명서 파일(CLAUDE.md / AGENTS.md / GEMINI.md)로 복사
-  const rolePath = path.join(dir, 'role.md');
+  // role.md(원본) → 엔진별 설명서 파일(CLAUDE.md / AGENTS.md / GEMINI.md)로 복사. role.local.md 가 있으면 그걸 우선 사용
+  const rolePath = fs.existsSync(path.join(dir, 'role.local.md')) ? path.join(dir, 'role.local.md') : path.join(dir, 'role.md');
   const engine = CFG.engines[a.engine];
   if (fs.existsSync(rolePath) && engine?.roleFile) fs.copyFileSync(rolePath, path.join(dir, engine.roleFile));
   agents[a.id] = { cfg: a, dir, off: false, current: null, queue: [], lastLine: '', log: [] };
@@ -147,13 +161,19 @@ function pump() {
   order.forEach(pushAgent);
 }
 
+// 결과물로 취급하지 않는 폴더/파일 (용량이 크거나 의미 없는 것)
+const SKIP = new Set(['node_modules', '.git', '.venv', 'venv', '__pycache__', '.next', '.cache', 'dist-ssr', '.DS_Store']);
+
 function copyNewer(src, dst) {
   if (!fs.existsSync(src)) return;
   fs.mkdirSync(dst, { recursive: true });
   for (const e of fs.readdirSync(src, { withFileTypes: true })) {
+    if (SKIP.has(e.name)) continue;
     const s = path.join(src, e.name), d = path.join(dst, e.name);
-    if (e.isDirectory()) copyNewer(s, d);
-    else if (!fs.existsSync(d) || fs.statSync(s).mtimeMs > fs.statSync(d).mtimeMs) fs.copyFileSync(s, d);
+    try {
+      if (e.isDirectory()) copyNewer(s, d);
+      else if (e.isFile() && (!fs.existsSync(d) || fs.statSync(s).mtimeMs > fs.statSync(d).mtimeMs)) fs.copyFileSync(s, d);
+    } catch {}
   }
 }
 
@@ -161,12 +181,16 @@ function listFiles(dir, base = dir) {
   if (!fs.existsSync(dir)) return [];
   let out = [];
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (SKIP.has(e.name)) continue;
     const p = path.join(dir, e.name);
-    if (e.isDirectory()) out = out.concat(listFiles(p, base));
-    else {
-      const st = fs.statSync(p);
-      out.push({ path: path.relative(base, p).split(path.sep).join('/'), size: st.size, mtime: st.mtimeMs });
-    }
+    try {
+      if (e.isDirectory()) out = out.concat(listFiles(p, base));
+      else if (e.isFile()) {
+        const st = fs.statSync(p);
+        out.push({ path: path.relative(base, p).split(path.sep).join('/'), size: st.size, mtime: st.mtimeMs });
+      }
+    } catch {}
+    if (out.length > 2000) break;
   }
   return out;
 }
@@ -251,7 +275,11 @@ function startTask(a, task) {
     const e = CFG.engines[a.cfg.engine];
     if (!e) return finishTask(a, task, outBefore, false, `엔진 설정을 찾을 수 없습니다: ${a.cfg.engine}`);
     cmd = e.cmd;
-    args = e.args.map((x) => x.replace('{PROMPT}', prompt).replace('{RESULT_FILE}', resultFile)).concat(a.cfg.extraArgs || []);
+    args = e.args.map((x) => x.replace('{PROMPT}', prompt).replace('{RESULT_FILE}', resultFile));
+    // 직원별로 추가 허용할 도구 (예: 디자이너의 이미지 생성 MCP)
+    const ai = args.indexOf('--allowedTools');
+    if (ai >= 0 && (a.cfg.allowTools || []).length) args[ai + 1] += ',' + a.cfg.allowTools.join(',');
+    args = args.concat(a.cfg.extraArgs || []);
     parser = e.parser;
     resultFromFile = !!e.resultFromFile;
     useShell = IS_WIN; // Windows에서는 claude/codex/gemini가 .cmd 파일이라 shell 필요
@@ -350,7 +378,7 @@ function finishTask(a, task, outBefore, ok, text) {
 
   // 새로 생긴/바뀐 결과 파일 → shared 폴더로 복사
   const files = [];
-  for (const f of listFiles(path.join(a.dir, 'output'))) {
+  for (const f of listFiles(path.join(a.dir, 'output'))) try {
     if (outBefore.get(f.path) === f.mtime) continue;
     let dest = f.path;
     const srcAbs = path.join(a.dir, 'output', f.path);
@@ -362,7 +390,7 @@ function finishTask(a, task, outBefore, ok, text) {
     fs.mkdirSync(path.dirname(path.join(SHARED, dest)), { recursive: true });
     fs.copyFileSync(srcAbs, path.join(SHARED, dest));
     files.push(dest);
-  }
+  } catch (e) { log(id, `⚠️ 결과 파일 복사 실패: ${f.path} (${e.message})`); }
   if (files.length) emit('files', listFiles(SHARED));
 
   // 업무 나누기 블록 해석
@@ -390,7 +418,10 @@ function finishTask(a, task, outBefore, ok, text) {
   addChat({ from: id, text: shown.slice(0, 6000), files, ok, jobId: job.id });
   job.results.push({ agentId: id, text: shown, files, ok, kind: task.kind });
   if (task.kind === 'delegated') job.needsReview = true;
-  for (const d of delegations) enqueue(d.target, { kind: 'delegated', instruction: d.body, from: id, job, canDelegate: false });
+  for (const d of delegations) {
+    if (agents[d.target].off) addChat({ from: 'system', text: `${nameOf(d.target)}은(는) 퇴근 상태라 업무가 대기 중이에요. 출근시키면 바로 시작합니다.` });
+    enqueue(d.target, { kind: 'delegated', instruction: d.body, from: id, job, canDelegate: false });
+  }
 
   job.open.delete(task.id);
   if (job.open.size === 0 && job.owner === LEAD && job.needsReview && !agents[LEAD].off) {
@@ -411,7 +442,9 @@ const MIME = {
 };
 
 function safeJoin(base, rel) {
-  const p = path.normalize(path.join(base, decodeURIComponent(rel)));
+  let dec;
+  try { dec = decodeURIComponent(rel); } catch { return null; }
+  const p = path.normalize(path.join(base, dec));
   return p === base || p.startsWith(base + path.sep) ? p : null;
 }
 
@@ -431,9 +464,27 @@ function readBody(req) {
 
 const json = (res, obj, code = 200) => { res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(obj)); };
 
+const LOCAL_HOSTS = new Set([`localhost:${PORT}`, `127.0.0.1:${PORT}`]);
+let updating = false;
+
 const server = http.createServer(async (req, res) => {
+  try { await handle(req, res); } catch (e) {
+    console.error('요청 처리 오류:', e);
+    if (!res.headersSent) json(res, { error: '서버 오류: ' + e.message }, 500); else res.end();
+  }
+});
+
+async function handle(req, res) {
   const url = new URL(req.url, 'http://localhost');
   const p = url.pathname;
+  // 보안: 다른 웹사이트가 내 AI 직원에게 몰래 지시하지 못하도록 막기
+  if (!LOCAL_HOSTS.has(req.headers.host)) { res.writeHead(403); return res.end('forbidden'); }
+  if (req.method !== 'GET') {
+    const origin = req.headers.origin;
+    if ((origin && !LOCAL_HOSTS.has(origin.replace(/^https?:\/\//, ''))) || req.headers['x-office'] !== '1') {
+      res.writeHead(403); return res.end('forbidden');
+    }
+  }
 
   if (p === '/api/events') {
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
@@ -507,9 +558,51 @@ const server = http.createServer(async (req, res) => {
     pump();
     return json(res, { ok: true });
   }
-  if (p.startsWith('/files/')) return serveFile(res, safeJoin(SHARED, p.slice(7)));
+  if (p === '/api/version') {
+    let latest = null;
+    try {
+      const r = await fetch(`${REPO_RAW}/VERSION`, { signal: AbortSignal.timeout(5000), cache: 'no-store' });
+      if (r.ok) latest = (await r.text()).trim();
+    } catch {}
+    return json(res, { current: VERSION, latest, canUpdate: process.platform !== 'win32' && fs.existsSync(path.join(ROOT, 'install-mac.sh')) });
+  }
+  if (p === '/api/update' && req.method === 'POST') {
+    if (updating) return json(res, { error: '이미 업데이트 중입니다' }, 409);
+    if (order.some((id) => agents[id].current)) return json(res, { error: '일하는 직원이 있어요. 끝난 뒤에 업데이트해 주세요' }, 409);
+    updating = true;
+    const child = spawn('bash', [path.join(ROOT, 'install-mac.sh'), '--update'], { cwd: ROOT, env: process.env });
+    let out = '';
+    child.stdout.on('data', (d) => { out += d; });
+    child.stderr.on('data', (d) => { out += d; });
+    child.on('close', (code) => {
+      updating = false;
+      if (code !== 0) return json(res, { error: '업데이트 실패:\n' + out.slice(-800) }, 500);
+      json(res, { ok: true });
+      addChat({ from: 'system', text: '새 버전으로 업데이트했어요. 사무실을 다시 여는 중... 🔄' });
+      setTimeout(() => process.exit(42), 500); // 42 = 실행 파일이 자동으로 다시 켜도록 하는 신호
+    });
+    return;
+  }
+  if (p.startsWith('/files/')) {
+    // 직원이 만든 HTML 파일은 격리해서 보여줌 (사무실 기능에 접근 못 하게)
+    res.setHeader('Content-Security-Policy', 'sandbox allow-scripts allow-popups allow-forms');
+    return serveFile(res, safeJoin(SHARED, p.slice(7)));
+  }
   if (p === '/') return serveFile(res, path.join(PUBLIC, 'index.html'));
   return serveFile(res, safeJoin(PUBLIC, p.slice(1)));
+}
+
+// 예상 못 한 오류가 나도 사무실 전체가 꺼지지 않게
+process.on('uncaughtException', (e) => console.error('⚠️ 오류 (계속 실행 중):', e));
+process.on('unhandledRejection', (e) => console.error('⚠️ 오류 (계속 실행 중):', e));
+
+server.on('error', (e) => {
+  if (e.code === 'EADDRINUSE') {
+    console.log(`\n🏢 AI 오피스가 이미 켜져 있어요 → http://localhost:${PORT}`);
+    if (process.platform === 'darwin') spawn('open', [`http://localhost:${PORT}`]);
+    process.exit(0);
+  }
+  throw e;
 });
 
 // 내 컴퓨터에서만 접속 가능 (127.0.0.1). 직원들이 파일을 만들 수 있으므로 외부에 열지 않습니다.
@@ -517,4 +610,5 @@ server.listen(PORT, '127.0.0.1', () => {
   console.log(`\n🏢 AI 오피스 출근 완료! 브라우저에서 여세요 → http://localhost:${PORT}`);
   if (MOCK) console.log('   (연습 모드: 실제 AI 대신 가짜 직원이 일합니다)');
   console.log('   종료: 이 창에서 Ctrl + C\n');
+  if (process.env.OFFICE_OPEN === '1' && process.platform === 'darwin') spawn('open', [`http://localhost:${PORT}`]);
 });
