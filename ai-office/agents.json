@@ -59,7 +59,7 @@
       "id": "researcher",
       "name": "리서처",
       "nickname": "킁킁",
-      "engine": "gemini",
+      "engine": "codex",
       "role": "트렌드, 경쟁 채널, 자료 조사 (출처 포함)",
       "prop": "🔍",
       "character": { "type": "dog", "color": "#fff7ec", "accent": "#ffb08a" },
