@@ -10,7 +10,7 @@
     "claude": {
       "label": "Claude Code",
       "cmd": "claude",
-      "args": ["-p", "{PROMPT}", "--output-format", "stream-json", "--verbose", "--permission-mode", "acceptEdits"],
+      "args": ["-p", "{PROMPT}", "--output-format", "stream-json", "--verbose", "--permission-mode", "dontAsk", "--allowedTools", "Read,Write,Edit,MultiEdit,Glob,Grep,WebSearch,WebFetch,TodoWrite,Bash(ls:*),Bash(mkdir:*),Bash(cat:*),Bash(node:*),Bash(python3:*),Bash(npm:*),Bash(npx:*)"],
       "parser": "claude-stream",
       "roleFile": "CLAUDE.md"
     },

@@ -212,7 +212,7 @@ function buildTaskFile(a, task) {
   if (task.canDelegate) {
     L.push('', '## 팀원 목록', teamList(), '');
     L.push('## 업무 나누는 법');
-    L.push('큰 일은 직접 하지 말고 팀원에게 나누세요. 형식은 정확히 아래와 같습니다. 블록 밖의 글은 대표님께 보이는 보고입니다.');
+    L.push('파일을 찾아보거나 명령을 실행하지 말고, 이 지시서만 보고 바로 판단하세요. 큰 일은 직접 하지 말고 팀원에게 나누세요. 형식은 정확히 아래와 같습니다. 블록 밖의 글은 대표님께 보이는 보고입니다.');
     L.push('', '<업무 to="planner">', '구체적인 지시: 목표, 결과물 형태, 파일명, 완료 기준', '</업무>', '');
     L.push('- 한 번에 여러 개를 보낼 수 있습니다. 결과가 서로 필요한 일은 먼저 할 일만 보내세요. 결과가 오면 다음 차례에 다시 나눌 수 있습니다.');
     L.push('- 간단한 질문이나 인사에는 업무를 나누지 말고 바로 답하세요.');
@@ -220,6 +220,7 @@ function buildTaskFile(a, task) {
   L.push('', '## 작업 규칙');
   L.push('- 결과 파일은 반드시 ./output/ 폴더에 저장하세요. 파일명은 영어 소문자와 하이픈으로 (예: output/landing-plan.md).');
   L.push('- 다른 팀원의 결과물은 ./shared/ 폴더에 있습니다. 읽기만 하세요.');
+  L.push('- 지금 폴더 밖(../ 등)은 열어보거나 명령을 실행하지 마세요. 권한이 막혀 있습니다. 필요한 정보는 이 지시서와 ./shared/ 에 다 있습니다.');
   L.push('- 마지막 답변은 한국어로, 대표님께 보고하듯 짧게: 한 일 / 만든 파일 / 확인이 필요한 것.');
   return L.join('\n');
 }
@@ -265,7 +266,7 @@ function startTask(a, task) {
   }
   task.child = child;
   child.stdin.end();
-  let stdout = '', finalText = null, isError = false, buf = '';
+  let stdout = '', finalText = null, isError = false, buf = '', assistantText = '';
 
   const onLine = (line) => {
     if (parser === 'claude-stream') {
@@ -273,7 +274,7 @@ function startTask(a, task) {
       try { o = JSON.parse(line); } catch { return log(id, line); }
       if (o.type === 'assistant' && o.message?.content) {
         for (const c of o.message.content) {
-          if (c.type === 'text' && c.text) c.text.split('\n').forEach((l) => log(id, '💬 ' + l));
+          if (c.type === 'text' && c.text) { assistantText += c.text + '\n'; c.text.split('\n').forEach((l) => log(id, '💬 ' + l)); }
           if (c.type === 'tool_use') {
             const inp = c.input || {};
             const hint = inp.file_path || inp.path || inp.command || inp.pattern || inp.url || inp.query || inp.description || '';
@@ -283,6 +284,7 @@ function startTask(a, task) {
       } else if (o.type === 'result') {
         finalText = o.result ?? '';
         isError = !!o.is_error;
+        for (const d of o.permission_denials || []) log(id, `🚫 허용되지 않은 작업이라 건너뜀: ${d.tool_name} ${JSON.stringify(d.tool_input || {}).slice(0, 100)}`);
       }
     } else {
       log(id, line);
@@ -314,10 +316,14 @@ function startTask(a, task) {
     if (task.timedOut) return finishTask(a, task, outBefore, false, `시간 초과(${SET.taskTimeoutMinutes}분)로 중지했습니다.`);
     let text = finalText;
     if (text == null && resultFromFile && fs.existsSync(resultFile)) text = fs.readFileSync(resultFile, 'utf8');
-    if (text == null) text = parser === 'claude-stream' ? '' : stdout;
+    if (text == null) text = parser === 'claude-stream' ? assistantText : stdout;
     text = text.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '').trim();
     const ok = code === 0 && !isError;
-    if (!text) text = ok ? '(답변 없이 끝났습니다)' : `오류로 끝났습니다 (종료 코드 ${code}). 아래 터미널 기록을 확인하세요.`;
+    if (!ok) {
+      const tail = a.log.slice(-12).join('\n');
+      text = `${text ? text + '\n\n' : ''}⚠️ 오류로 끝났습니다 (종료 코드 ${code}). 마지막 기록:\n${tail}`;
+    }
+    if (!text) text = '(답변 없이 끝났습니다)';
     finishTask(a, task, outBefore, ok, text);
   };
   child.on('error', (err) => {
