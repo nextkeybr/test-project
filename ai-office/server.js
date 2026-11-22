@@ -65,7 +65,8 @@ function emit(type, data) {
 function imageFor(id, suffix) {
   for (const ext of ['png', 'webp', 'gif', 'jpg', 'jpeg']) {
     const f = `characters/${id}${suffix}.${ext}`;
-    if (fs.existsSync(path.join(PUBLIC, f))) return f;
+    const abs = path.join(PUBLIC, f);
+    if (fs.existsSync(abs)) return `${f}?v=${Math.round(fs.statSync(abs).mtimeMs)}`;
   }
   return null;
 }
@@ -462,6 +463,24 @@ const server = http.createServer(async (req, res) => {
     addChat({ from: 'me', to, text });
     createJob(to, text);
     return json(res, { ok: true, to });
+  }
+  // 캐릭터 이미지 바꾸기 (화면에 끌어다 놓기)
+  const im = p.match(/^\/api\/agent\/([a-z0-9_-]+)\/image$/);
+  if (im && agents[im[1]] && (req.method === 'POST' || req.method === 'DELETE')) {
+    const suffix = url.searchParams.get('work') === '1' ? '-work' : '';
+    const dir = path.join(PUBLIC, 'characters');
+    fs.mkdirSync(dir, { recursive: true });
+    for (const e of ['png', 'webp', 'gif', 'jpg', 'jpeg']) fs.rmSync(path.join(dir, `${im[1]}${suffix}.${e}`), { force: true });
+    if (req.method === 'POST') {
+      const ext = { 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif', 'image/jpeg': 'jpg' }[req.headers['content-type']];
+      if (!ext) return json(res, { error: 'png, webp, gif, jpg 이미지만 됩니다' }, 400);
+      const chunks = [];
+      let size = 0;
+      for await (const c of req) { size += c.length; if (size > 15e6) return json(res, { error: '15MB 이하만 됩니다' }, 400); chunks.push(c); }
+      fs.writeFileSync(path.join(dir, `${im[1]}${suffix}.${ext}`), Buffer.concat(chunks));
+    }
+    pushAgent(im[1]);
+    return json(res, { ok: true });
   }
   const am = p.match(/^\/api\/agent\/([a-z0-9_-]+)\/(toggle|stop|clear)$/);
   if (am && req.method === 'POST') {

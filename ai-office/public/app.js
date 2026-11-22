@@ -217,4 +217,83 @@ document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () 
   $('#fileList').classList.toggle('hidden', b.dataset.tab !== 'files');
 }));
 
+// ---------- 캐릭터 이미지 바꾸기 ----------
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+async function uploadImage(id, file, work) {
+  if (!file || !/^image\/(png|webp|gif|jpeg)$/.test(file.type)) return toast('png, jpg, webp, gif 이미지만 넣을 수 있어요');
+  const r = await fetch(`/api/agent/${id}/image${work ? '?work=1' : ''}`, { method: 'POST', headers: { 'Content-Type': file.type }, body: file });
+  const j = await r.json();
+  if (j.error) return toast(j.error);
+  if (els[id]) els[id].imgKey = '';
+  toast(`${S.agents[id].name}${work ? ' (일할 때)' : ''} 캐릭터를 바꿨어요 ✨`);
+}
+let pickTarget = null;
+$('#imgPick').addEventListener('change', (e) => {
+  const f = e.target.files[0];
+  if (f && pickTarget) uploadImage(pickTarget.id, f, pickTarget.work);
+  e.target.value = '';
+});
+function closeMenu() { document.querySelector('.img-menu')?.remove(); }
+$('#cImg').addEventListener('click', (e) => {
+  e.stopPropagation();
+  closeMenu();
+  const id = S.selected;
+  if (!id) return;
+  const a = S.agents[id];
+  const m = document.createElement('div');
+  m.className = 'img-menu';
+  const items = [
+    ['기본 모습 이미지 고르기', () => { pickTarget = { id, work: false }; $('#imgPick').click(); }],
+    ['일할 때 모습 이미지 고르기 (선택)', () => { pickTarget = { id, work: true }; $('#imgPick').click(); }],
+  ];
+  if (a.image || a.workImage) items.push(['원래 캐릭터로 되돌리기', async () => {
+    await fetch(`/api/agent/${id}/image`, { method: 'DELETE' });
+    await fetch(`/api/agent/${id}/image?work=1`, { method: 'DELETE' });
+    if (els[id]) els[id].imgKey = '';
+    toast('원래 캐릭터로 되돌렸어요');
+  }]);
+  for (const [label, fn] of items) {
+    const b = document.createElement('button');
+    b.textContent = label;
+    b.onclick = () => { closeMenu(); fn(); };
+    m.appendChild(b);
+  }
+  const r = e.target.getBoundingClientRect();
+  m.style.left = Math.min(r.left, innerWidth - 260) + 'px';
+  m.style.top = (r.top - 8) + 'px';
+  m.style.transform = 'translateY(-100%)';
+  document.body.appendChild(m);
+});
+document.addEventListener('click', closeMenu);
+
+// 이미지 파일을 직원 목록이나 캐릭터, 책상 위에 끌어다 놓으면 바로 바뀜
+function dropTargetId(el) {
+  const t = el.closest?.('.staff-item, .char, .desk, .chair, .tag, .console');
+  if (!t) return null;
+  return t.classList.contains('console') ? S.selected : t.dataset.id;
+}
+let lastDrop = null;
+document.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  const t = e.target.closest?.('.staff-item, .char, .desk, .chair, .tag, .console');
+  if (lastDrop && lastDrop !== t) lastDrop.classList.remove('drop-on');
+  if (t) { t.classList.add('drop-on'); lastDrop = t; }
+});
+document.addEventListener('dragleave', (e) => { if (!e.relatedTarget && lastDrop) lastDrop.classList.remove('drop-on'); });
+document.addEventListener('drop', (e) => {
+  e.preventDefault();
+  if (lastDrop) lastDrop.classList.remove('drop-on');
+  const id = dropTargetId(e.target);
+  const f = e.dataTransfer.files[0];
+  if (!f) return;
+  if (!id) return toast('직원 목록이나 캐릭터 위에 놓아 주세요');
+  uploadImage(id, f, e.shiftKey);
+});
+
 init();

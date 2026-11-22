@@ -49,6 +49,7 @@
         <span id="cEngine" class="muted small"></span>
         <span class="grow"></span>
         <span class="live"><i></i>LIVE</span>
+        <button class="btn sm" id="cImg" title="이미지 파일을 캐릭터나 직원 목록에 끌어다 놓아도 됩니다">🖼 캐릭터 바꾸기</button>
         <button class="btn sm" id="cStop">작업 중지</button>
         <button class="btn sm" id="cToggle">퇴근</button>
       </header>
@@ -60,6 +61,8 @@
     </section>
   </main>
 </div>
+<input type="file" id="imgPick" accept="image/png,image/webp,image/gif,image/jpeg" hidden>
+<div id="toast" class="toast"></div>
 <script src="characters.js"></script>
 <script src="office.js"></script>
 <script src="app.js"></script>
