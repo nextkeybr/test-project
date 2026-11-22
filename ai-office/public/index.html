@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 오피스</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <section class="card staff">
+      <header class="card-h">
+        <b>직원</b><span class="muted" id="attend">출근 0 / 0</span>
+        <span class="grow"></span>
+        <button class="btn sm" id="allOn">전체 출근</button>
+        <button class="btn sm" id="allOff">전체 퇴근</button>
+      </header>
+      <ul id="staffList" class="staff-list"></ul>
+    </section>
+    <section class="card chat">
+      <header class="card-h tabs">
+        <button class="tab on" data-tab="chat">전체 채팅</button>
+        <button class="tab" data-tab="files">결과물 <span id="fileCount" class="count">0</span></button>
+      </header>
+      <div id="chatList" class="chat-list"></div>
+      <div id="fileList" class="file-list hidden"></div>
+      <form id="chatForm" class="chat-form">
+        <input id="chatInput" autocomplete="off" placeholder="비서에게 지시하기 — @기획자 처럼 이름을 붙이면 그 직원에게">
+        <button class="btn dark">보내기</button>
+      </form>
+    </section>
+  </aside>
+
+  <main class="main">
+    <div class="scene-wrap">
+      <div id="scene" class="scene">
+        <div id="bg" class="bg"></div>
+        <div id="layer" class="layer"></div>
+        <div id="mockBadge" class="mock-badge hidden">연습 모드 — 실제 AI 대신 가짜 직원이 일하는 중</div>
+      </div>
+    </div>
+
+    <section class="card console">
+      <header class="console-h">
+        <span id="cAvatar" class="mini"></span>
+        <b id="cName">직원을 선택하세요</b>
+        <span id="cStatus" class="pill"></span>
+        <span id="cEngine" class="muted small"></span>
+        <span class="grow"></span>
+        <span class="live"><i></i>LIVE</span>
+        <button class="btn sm" id="cStop">작업 중지</button>
+        <button class="btn sm" id="cToggle">퇴근</button>
+      </header>
+      <pre id="cLog" class="term"></pre>
+      <form id="cForm" class="console-form">
+        <input id="cInput" autocomplete="off" placeholder="이 직원에게 직접 지시하기 — Enter">
+        <button class="btn dark">보내기</button>
+      </form>
+    </section>
+  </main>
+</div>
+<script src="characters.js"></script>
+<script src="office.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

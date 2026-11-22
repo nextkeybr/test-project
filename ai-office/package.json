@@ -1,0 +1,11 @@
+{
+  "name": "ai-office",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI 직원들이 일하는 귀여운 사무실",
+  "scripts": {
+    "start": "node server.js",
+    "demo": "node server.js --mock"
+  },
+  "engines": { "node": ">=18" }
+}

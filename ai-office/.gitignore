@@ -1,0 +1,12 @@
+data/
+shared/
+agents/*/inbox/
+agents/*/done/
+agents/*/output/
+agents/*/shared/
+agents/*/CLAUDE.md
+agents/*/AGENTS.md
+agents/*/GEMINI.md
+public/characters/*
+!public/characters/README.md
+public/office-bg.*

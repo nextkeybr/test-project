@@ -1,0 +1,107 @@
+{
+  "settings": {
+    "port": 3939,
+    "leadAgent": "secretary",
+    "maxParallel": 3,
+    "taskTimeoutMinutes": 30,
+    "maxRounds": 4
+  },
+  "engines": {
+    "claude": {
+      "label": "Claude Code",
+      "cmd": "claude",
+      "args": ["-p", "{PROMPT}", "--output-format", "stream-json", "--verbose", "--permission-mode", "acceptEdits"],
+      "parser": "claude-stream",
+      "roleFile": "CLAUDE.md"
+    },
+    "codex": {
+      "label": "Codex CLI",
+      "cmd": "codex",
+      "args": ["exec", "--full-auto", "--skip-git-repo-check", "--output-last-message", "{RESULT_FILE}", "{PROMPT}"],
+      "parser": "text",
+      "resultFromFile": true,
+      "roleFile": "AGENTS.md"
+    },
+    "gemini": {
+      "label": "Gemini CLI",
+      "cmd": "gemini",
+      "args": ["-p", "{PROMPT}", "--approval-mode", "auto_edit"],
+      "parser": "text",
+      "roleFile": "GEMINI.md"
+    }
+  },
+  "agents": [
+    {
+      "id": "secretary",
+      "name": "비서",
+      "nickname": "모찌",
+      "engine": "claude",
+      "role": "대표님 지시를 받아 업무를 나누고, 결과를 모아 보고",
+      "prop": "📋",
+      "character": { "type": "bunny", "color": "#ffffff", "accent": "#ffb3c7" },
+      "desk": { "x": 46, "y": 42 },
+      "rest": { "x": 11, "y": 47 },
+      "extraArgs": []
+    },
+    {
+      "id": "planner",
+      "name": "기획자",
+      "nickname": "곰곰",
+      "engine": "claude",
+      "role": "기획서, 콘텐츠 구성안, 일정표 작성",
+      "prop": "🗂️",
+      "character": { "type": "bear", "color": "#f3dcc0", "accent": "#ff9fb2" },
+      "desk": { "x": 63, "y": 42 },
+      "rest": { "x": 17.5, "y": 47 },
+      "extraArgs": []
+    },
+    {
+      "id": "researcher",
+      "name": "리서처",
+      "nickname": "킁킁",
+      "engine": "gemini",
+      "role": "트렌드, 경쟁 채널, 자료 조사 (출처 포함)",
+      "prop": "🔍",
+      "character": { "type": "dog", "color": "#fff7ec", "accent": "#ffb08a" },
+      "desk": { "x": 80, "y": 42 },
+      "rest": { "x": 24, "y": 47 },
+      "extraArgs": []
+    },
+    {
+      "id": "developer",
+      "name": "개발자",
+      "nickname": "냥코",
+      "engine": "claude",
+      "role": "웹페이지, 자동화 스크립트, 도구 개발",
+      "prop": "💻",
+      "character": { "type": "cat", "color": "#ffffff", "accent": "#ffb3c7" },
+      "desk": { "x": 46, "y": 74 },
+      "rest": { "x": 8, "y": 80 },
+      "extraArgs": []
+    },
+    {
+      "id": "designer",
+      "name": "디자이너",
+      "nickname": "햄찌",
+      "engine": "claude",
+      "role": "썸네일, 이미지, 화면 디자인 (이미지 생성 도구 사용)",
+      "prop": "🎨",
+      "character": { "type": "hamster", "color": "#fffaf3", "accent": "#e8b27a" },
+      "desk": { "x": 63, "y": 74 },
+      "rest": { "x": 27, "y": 80 },
+      "extraArgs": []
+    },
+    {
+      "id": "marketer",
+      "name": "마케터",
+      "nickname": "삐약",
+      "engine": "codex",
+      "role": "후킹 문구, SNS 게시글, 홍보 카피 여러 버전",
+      "prop": "📣",
+      "character": { "type": "chick", "color": "#fff1a8", "accent": "#ffb3a0" },
+      "desk": { "x": 80, "y": 74 },
+      "rest": { "x": 41, "y": 27 },
+      "extraArgs": []
+    }
+  ]
+}
