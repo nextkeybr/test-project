@@ -433,6 +433,7 @@ function uploadOne(file, onProgress) {
     xhr.setRequestHeader('X-File-Name', encodeURIComponent(file.name));
     xhr.setRequestHeader('Content-Type', 'application/octet-stream');
     xhr.upload.onprogress = (ev) => ev.lengthComputable && onProgress(Math.round((ev.loaded / ev.total) * 100));
+    xhr.upload.onload = () => { if (/\.(mp4|mov|webm|m4v|avi|mkv)$/i.test(file.name)) toast(`🎬 ${file.name}: 장면 분석 중... (긴 영상은 조금 걸려요)`); };
     xhr.onload = () => { let j = {}; try { j = JSON.parse(xhr.responseText); } catch {} resolve(j); };
     xhr.onerror = () => resolve({ error: '올리기 실패 (연결 끊김)' });
     xhr.send(file);
@@ -444,6 +445,10 @@ async function uploadFiles(k, files) {
     toast(`올리는 중: ${f.name}`);
     const j = await uploadOne(f, (pct) => toast(`올리는 중: ${f.name} ${pct}%`));
     if (j.error) { toast(`${f.name}: ${j.error}`); await new Promise((r) => setTimeout(r, 1800)); continue; }
+    if (j.kind === 'video') {
+      toast(j.analyzed ? `🎬 ${f.name}: 장면 모음표를 만들었어요` : j.ffmpeg ? `🎬 ${f.name}: 영상 정보를 읽지 못했어요` : `🎬 ${f.name}: ffmpeg 이 없어 장면 분석은 건너뛰었어요`);
+      await new Promise((r) => setTimeout(r, 1500));
+    }
     if (!ATT[k].includes(j.path)) ATT[k].push(j.path);
     ok++;
     renderAtt(k);

@@ -4,7 +4,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { spawn } = require('child_process');
+const { spawn, execFile } = require('child_process');
 
 const ROOT = __dirname;
 // agents.json = 기본 설정 (업데이트로 바뀜). agents.local.json = 내 설정 (업데이트해도 안 바뀜)
@@ -238,7 +238,15 @@ function attachmentsText(list) {
       try { const b = fs.statSync(abs).size; size = b < 1024 * 1024 ? ` · ${Math.max(1, Math.round(b / 1024))}KB` : ` · ${(b / 1024 / 1024).toFixed(1)}MB`; } catch {}
       const k = kindOf(rel);
       if (k === 'image') L.push(`(이미지 레퍼런스${size}. 이미지 보기 도구로 shared/${rel} 를 직접 열어 색감·구도·분위기를 확인하고 반영하세요.)`);
-      else if (k === 'video') L.push(`(영상 파일${size}. 직접 재생은 못 할 수 있으니, 파일 이름과 대표님 지시를 기준으로 작업하고 필요하면 확인 질문을 남기세요.)`);
+      else if (k === 'video') {
+        const infoPath = path.join(SHARED, `${rel}.analysis`, 'info.md');
+        if (fs.existsSync(infoPath)) {
+          L.push(`(영상 파일${size}. 영상은 직접 재생할 수 없으니, 아래 분석 자료와 장면 이미지를 열어 보고 판단하세요.)`, '');
+          L.push(fs.readFileSync(infoPath, 'utf8').replace(/^# /, '#### ').replace(/\n## /g, '\n##### '));
+        } else {
+          L.push(`(영상 파일${size}. 직접 재생할 수 없고 분석 자료(ffmpeg)도 없어서, 파일 이름과 대표님 지시를 기준으로 작업하고 필요하면 확인 질문을 남기세요.)`);
+        }
+      }
       else if (k === 'audio') L.push(`(음악/나레이션 파일${size}. 직접 들을 수 없으면 파일 이름과 대표님 지시를 기준으로 작업하세요.)`);
       else if (rel.toLowerCase().endsWith('.pdf')) L.push(`(PDF 문서${size}. 파일을 직접 열어 읽으세요.)`);
       else L.push(`(파일${size}. 필요하면 직접 열어 보세요.)`);
@@ -515,6 +523,55 @@ const UPLOAD_KIND = {
 const kindOf = (f) => Object.keys(UPLOAD_KIND).find((k) => UPLOAD_KIND[k].includes(path.extname(f).toLowerCase())) || null;
 const MAX_UPLOAD = 2 * 1024 * 1024 * 1024; // 2GB
 
+// ---------- 영상 분석 (ffmpeg): 장면 모음표 + 첫 3초 + 영상 정보 ----------
+const run = (cmd, args, timeout = 120000) => new Promise((resolve) => {
+  execFile(cmd, args, { timeout, windowsHide: true, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => resolve({ err, stdout: String(stdout || ''), stderr: String(stderr || '') }));
+});
+let HAS_FFMPEG = false;
+run('ffmpeg', ['-version'], 10000).then((r) => { HAS_FFMPEG = !r.err; if (!HAS_FFMPEG) console.log('ℹ️ ffmpeg 이 없어 영상 분석(장면 모음표)은 꺼져 있습니다. README 참고.'); });
+const fmtTime = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}.${Math.floor((t % 1) * 10)}`;
+
+async function analyzeVideo(abs, rel) {
+  if (!HAS_FFMPEG) return null;
+  const dirRel = `${rel}.analysis`;
+  const dir = path.join(SHARED, dirRel);
+  fs.mkdirSync(dir, { recursive: true });
+  const probe = await run('ffprobe', ['-v', 'error', '-show_entries', 'format=duration:stream=codec_type,width,height,r_frame_rate', '-of', 'json', abs], 30000);
+  let info = {};
+  try { info = JSON.parse(probe.stdout); } catch {}
+  const v = (info.streams || []).find((x) => x.codec_type === 'video') || {};
+  const hasAudio = (info.streams || []).some((x) => x.codec_type === 'audio');
+  const dur = Number(info.format?.duration) || 0;
+  if (!dur || !v.width) return null;
+  const [fn, fd] = String(v.r_frame_rate || '0/1').split('/').map(Number);
+  const fps = fd ? Math.round((fn / fd) * 100) / 100 : 0;
+  const ratio = v.width > v.height ? '가로' : v.width < v.height ? '세로' : '정사각';
+  // 전체 흐름: 최대 24장을 고르게 뽑아 한 장에 모음
+  const count = Math.max(4, Math.min(24, Math.ceil(dur)));
+  const step = dur / count;
+  const cols = 6, rows = Math.ceil(count / cols);
+  const sheet = await run('ffmpeg', ['-v', 'error', '-y', '-i', abs, '-vf', `fps=1/${step.toFixed(3)},scale=360:-2,tile=${cols}x${rows}:padding=10:margin=10:color=white`, '-frames:v', '1', '-q:v', '3', path.join(dir, 'scenes.jpg')]);
+  // 후킹 분석: 첫 3초를 0.25초 간격으로 12장
+  const hook = await run('ffmpeg', ['-v', 'error', '-y', '-t', '3', '-i', abs, '-vf', 'fps=4,scale=360:-2,tile=6x2:padding=10:margin=10:color=white', '-frames:v', '1', '-q:v', '3', path.join(dir, 'first-3s.jpg')]);
+  const L = [
+    `# 영상 분석 자료: ${path.basename(rel)}`,
+    '',
+    `- 길이: ${fmtTime(dur)} (${dur.toFixed(1)}초)`,
+    `- 화면: ${v.width}x${v.height} (${ratio} 영상), ${fps}fps`,
+    `- 소리: ${hasAudio ? '있음 (내용은 들을 수 없음. 필요하면 대표님께 대사·음악 설명을 요청)' : '없음'}`,
+    '',
+  ];
+  if (!sheet.err) {
+    L.push(`## 장면 모음표: \`shared/${dirRel}/scenes.jpg\``, `왼쪽 위부터 오른쪽으로, 줄 바꿔 아래로 시간 순서입니다. ${count}장, 약 ${step.toFixed(1)}초 간격.`);
+    L.push(Array.from({ length: count }, (_, i) => `${i + 1}번=${fmtTime(i * step)}`).join(', '), '');
+  }
+  if (!hook.err) L.push(`## 첫 3초 (후킹 구간): \`shared/${dirRel}/first-3s.jpg\``, '0.25초 간격 12장. 1~6번 = 0~1.25초, 7~12번 = 1.5~2.75초.', '');
+  L.push('## 분석할 때', '- 위 이미지 파일들을 이미지 보기 도구로 직접 열어서 보세요.', '- 컷 전환 속도, 구도·카메라 거리, 자막 위치·크기·색, 색감, 첫 3초에 무엇을 보여주는지를 확인할 수 있습니다.');
+  fs.writeFileSync(path.join(dir, 'info.md'), L.join('\n'));
+  const out = ['info.md', 'scenes.jpg', 'first-3s.jpg'].filter((f) => fs.existsSync(path.join(dir, f))).map((f) => `${dirRel}/${f}`);
+  return out;
+}
+
 function safeJoin(base, rel) {
   let dec;
   try { dec = decodeURIComponent(rel); } catch { return null; }
@@ -571,7 +628,7 @@ async function handle(req, res) {
   if (p === '/api/state') {
     const bg = ['png', 'jpg', 'jpeg', 'webp'].map((e) => `office-bg.${e}`).find((f) => fs.existsSync(path.join(PUBLIC, f))) || null;
     return json(res, {
-      lead: LEAD, mock: MOCK, background: bg,
+      lead: LEAD, mock: MOCK, background: bg, ffmpeg: HAS_FFMPEG,
       agents: order.map(snapshot),
       logs: Object.fromEntries(order.map((id) => [id, agents[id].log.slice(-200)])),
       chat: chat.slice(-200),
@@ -618,9 +675,14 @@ async function handle(req, res) {
     }).catch((e) => { try { fs.unlinkSync(abs); } catch {} throw e; });
     const rel = `uploads/${day}/${fname}`;
     filesMeta[rel] = { by: 'me', jobId: `upload-${day}`, request: `대표님이 올린 파일 (${day})`, time: Date.now() };
+    let analysis = null;
+    if (kindOf(rel) === 'video') {
+      analysis = await analyzeVideo(abs, rel).catch(() => null);
+      for (const f of analysis || []) filesMeta[f] = { by: 'me', jobId: `upload-${day}`, request: `대표님이 올린 파일 (${day})`, time: Date.now() };
+    }
     saveMeta();
     emit('files', filesWithMeta());
-    return json(res, { ok: true, path: rel, kind: kindOf(rel) });
+    return json(res, { ok: true, path: rel, kind: kindOf(rel), analyzed: !!(analysis && analysis.length), ffmpeg: HAS_FFMPEG });
   }
   // 캐릭터 이미지 바꾸기 (화면에 끌어다 놓기)
   const im = p.match(/^\/api\/agent\/([a-z0-9_-]+)\/image$/);
