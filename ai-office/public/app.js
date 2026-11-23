@@ -22,6 +22,23 @@ async function api(url, body) {
 
 // ---------- 사무실 장면 ----------
 const els = {};
+// 직원 수에 맞춰 책상·라운지 자리를 자동 배치 (3열, 줄이 늘면 조금씩 작게)
+const REST_SPOTS = [[18.3, 34], [9, 60], [18, 60], [27, 60], [8, 95], [28, 95], [18, 80], [31, 36], [5, 36], [13, 80], [24, 80], [18, 95]];
+let LAYOUT = {};
+function computeLayout() {
+  const n = S.order.length, rows = Math.max(2, Math.ceil(n / 3));
+  const scale = rows <= 2 ? 1 : rows === 3 ? 0.8 : 0.66;
+  const ys = rows <= 2 ? [50, 86] : Array.from({ length: rows }, (_, i) => 38 + i * (48 / (rows - 1)));
+  LAYOUT = { scale };
+  S.order.forEach((id, i) => {
+    const r = REST_SPOTS[i % REST_SPOTS.length];
+    LAYOUT[id] = { desk: { x: [47.5, 68.5, 89.5][i % 3], y: ys[Math.floor(i / 3)] }, rest: { x: r[0], y: r[1] } };
+  });
+  document.documentElement.style.setProperty('--sc', scale);
+  // 직원 목록 높이: 3명씩 한 줄, 3줄까지는 스크롤 없이 다 보이게
+  const listRows = Math.min(3, Math.ceil(n / 3));
+  document.documentElement.style.setProperty('--staffH', `${50 + listRows * 52 + 10}px`);
+}
 function setBackground(bg) {
   S.background = bg || null;
   $('#bg').innerHTML = bg ? `<img src="${esc(bg)}" alt="">` : officeRoom();
@@ -30,8 +47,9 @@ function buildScene(bg) {
   const layer = $('#layer');
   setBackground(bg);
   $('#furniture').innerHTML = officeFurniture();
+  computeLayout();
   for (const id of S.order) {
-    const a = S.agents[id];
+    const a = { ...S.agents[id], ...LAYOUT[id] };
     const chair = document.createElement('div');
     chair.className = 'chair';
     chair.innerHTML = chairSVG();
@@ -48,9 +66,9 @@ function buildScene(bg) {
       el.addEventListener('click', () => select(id));
       layer.appendChild(el);
     }
-    place(chair, a.desk.x + 3.5, a.desk.y - 3.5);
+    place(chair, a.desk.x + 3.5 * LAYOUT.scale, a.desk.y - 3.5 * LAYOUT.scale);
     place(desk, a.desk.x, a.desk.y);
-    place(tag, a.desk.x, a.desk.y + 6.7);
+    place(tag, a.desk.x, a.desk.y + 6.7 * LAYOUT.scale);
     chair.style.zIndex = Math.round(a.desk.y * 10) - 100;
     desk.style.zIndex = Math.round(a.desk.y * 10) + 40;
     tag.style.zIndex = Math.round(a.desk.y * 10) + 41; // 앞줄 캐릭터의 말풍선보다는 아래
@@ -61,10 +79,11 @@ function buildScene(bg) {
 function place(el, x, y) { el.style.left = x + '%'; el.style.top = y + '%'; }
 
 function updateScene(id, instant) {
-  const a = S.agents[id], e = els[id];
-  if (!e) return;
+  const e = els[id];
+  if (!e || !S.agents[id]) return;
+  const a = { ...S.agents[id], ...LAYOUT[id] };
   const atDesk = a.status === 'working';
-  const pos = atDesk ? { x: a.desk.x + 3.5, y: a.desk.y + 2.5 } : a.rest;
+  const pos = atDesk ? { x: a.desk.x + 3.5 * LAYOUT.scale, y: a.desk.y + 2.5 * LAYOUT.scale } : a.rest;
   e.ch.style.zIndex = Math.round(pos.y * 10); // 아래쪽(앞쪽)에 있는 캐릭터가 위로 보이게
   if (instant) e.ch.style.transition = 'none';
   const moved = e.ch.style.left && (e.ch.style.left !== pos.x + '%' || e.ch.style.top !== pos.y + '%');
@@ -184,6 +203,8 @@ async function init() {
   S.selected = S.lead;
   if (st.mock) $('#mockBadge').classList.remove('hidden');
   S.ffmpeg = st.ffmpeg;
+  S.engines = st.engines || [];
+  S.charTypes = st.charTypes || [];
   buildScene(st.background);
   renderStaff(); renderChat(); renderFiles(); renderConsole(true);
   setInterval(idleChatter, 4500);
@@ -200,6 +221,7 @@ async function init() {
     updateScene(a.id);
     renderStaff();
     if (a.id === S.selected) renderConsole(false);
+    if (!$('#mgr').classList.contains('hidden') && !document.activeElement?.closest?.('#mgForm')) renderManager();
   });
   es.addEventListener('log', (ev) => {
     const { id, line } = JSON.parse(ev.data);
@@ -215,6 +237,7 @@ async function init() {
   });
   es.addEventListener('chat', (ev) => { S.chat.push(JSON.parse(ev.data)); renderChat(); });
   es.addEventListener('files', (ev) => { S.files = JSON.parse(ev.data); renderFiles(); });
+  es.addEventListener('roster', () => location.reload());
   es.addEventListener('background', (ev) => { setBackground(JSON.parse(ev.data).url); });
 }
 
@@ -592,12 +615,13 @@ async function sceneSnapshot() {
   if (furn) g.drawImage(furn, 0, 0, W, H);
   const desk = await loadImg(svgSrc(deskSVG()));
   const items = [];
+  const sc = LAYOUT.scale || 1;
   for (const id of S.order) {
-    const a = S.agents[id];
-    items.push({ z: a.desk.y * 10 + 40, draw: () => desk && g.drawImage(desk, (a.desk.x - 9.5) / 100 * W, a.desk.y / 100 * H - (0.19 * W * 100 / 170) / 2, 0.19 * W, 0.19 * W * 100 / 170) });
+    const a = { ...S.agents[id], ...LAYOUT[id] };
+    items.push({ z: a.desk.y * 10 + 40, draw: () => desk && g.drawImage(desk, (a.desk.x - 9.5 * sc) / 100 * W, a.desk.y / 100 * H - (0.19 * sc * W * 100 / 170) / 2, 0.19 * sc * W, 0.19 * sc * W * 100 / 170) });
     const src = a.image ? a.image : svgSrc(charSVG(a.character || {}));
     const img = await loadImg(src);
-    const cw = 0.16 * W, chh = a.image ? cw : cw * 1.2;
+    const cw = 0.16 * sc * W, chh = a.image ? cw : cw * 1.2;
     items.push({ z: a.rest.y * 10, draw: () => img && g.drawImage(img, a.rest.x / 100 * W - cw / 2, a.rest.y / 100 * H - chh, cw, chh) });
   }
   items.sort((x, y) => x.z - y.z).forEach((it) => it.draw());
@@ -633,5 +657,52 @@ async function designBackground() {
   const r = await api('/api/background/design', { snapshot: j.path });
   if (!r.error) toast('디자이너에게 맡겼어요 🎨 완성되면 채팅에 이미지가 올라와요');
 }
+
+// ---------- 직원 관리: 추가 / 삭제 / AI 고르기 ----------
+function engineOptions(cur) {
+  return S.engines.map((e) => `<option value="${e.key}" ${e.key === cur ? 'selected' : ''} ${e.available === false && e.key !== cur ? 'disabled' : ''}>${esc(e.label)}${e.available === false ? ' (설치 안 됨)' : ''}</option>`).join('');
+}
+function renderManager() {
+  $('#mgList').innerHTML = S.order.map((id) => {
+    const a = S.agents[id];
+    return `<div class="mg-row" data-id="${id}">
+      <span class="mini">${avatar(a)}</span>
+      <div class="mg-name"><b>${esc(fullName(a))}</b><small>${esc(a.role || '')}</small></div>
+      <select class="mg-engine" title="이 직원이 쓰는 AI">${engineOptions(a.engine)}</select>
+      ${id === S.lead ? '<span class="muted small mg-lead">팀 리더</span>' : `<button type="button" class="btn sm mg-del" ${a.status === 'working' ? 'disabled title="일하는 중이라 삭제할 수 없어요"' : ''}>삭제</button>`}
+    </div>`;
+  }).join('');
+  $('#mgCount').textContent = `${S.order.length}명`;
+  document.querySelectorAll('.mg-engine').forEach((sel) => sel.addEventListener('change', async () => {
+    const id = sel.closest('.mg-row').dataset.id;
+    const j = await api(`/api/agent/${id}/engine`, { engine: sel.value });
+    if (!j.error) toast(`${S.agents[id].name} → ${sel.options[sel.selectedIndex].text} 적용 ✅`);
+  }));
+  document.querySelectorAll('.mg-del').forEach((b) => b.addEventListener('click', async () => {
+    const id = b.closest('.mg-row').dataset.id;
+    if (!confirm(`${fullName(S.agents[id])} 직원을 삭제할까요?\n작업 폴더와 결과물은 지워지지 않아요.`)) return;
+    await fetch(`/api/agents/${id}`, { method: 'DELETE', headers: { 'X-Office': '1' } }).then((r) => r.json()).then((j) => j.error && toast(j.error));
+  }));
+  $('#mgEngine').innerHTML = engineOptions('codex');
+  $('#mgType').innerHTML = S.charTypes.map((t) => `<option value="${t}">${{ bunny: '토끼', bear: '곰', cat: '고양이', dog: '강아지', hamster: '햄스터', chick: '병아리' }[t] || t}</option>`).join('');
+}
+async function openManager() {
+  renderManager();
+  $('#mgr').classList.remove('hidden');
+  // 설치 여부 다시 확인 (방금 설치했을 수도 있으니)
+  const j = await api('/api/engines', {});
+  if (j.engines) { S.engines = j.engines; renderManager(); }
+}
+$('#mgBtn').addEventListener('click', openManager);
+$('#cEngine').addEventListener('click', openManager);
+$('#mgClose').addEventListener('click', () => $('#mgr').classList.add('hidden'));
+$('#mgr').addEventListener('click', (e) => { if (e.target.id === 'mgr') $('#mgr').classList.add('hidden'); });
+$('#mgForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const body = Object.fromEntries(f.entries());
+  const j = await api('/api/agents', body);
+  if (!j.error) { toast('새 직원을 뽑았어요 🎉'); e.target.reset(); }
+});
 
 init();

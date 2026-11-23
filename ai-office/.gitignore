@@ -10,3 +10,5 @@ agents/*/GEMINI.md
 public/characters/*
 !public/characters/README.md
 public/office-bg.*
+agents.local.json
+agents/*/role.local.md

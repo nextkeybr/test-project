@@ -39,10 +39,10 @@ button, input { font: inherit; }
 .mini.me { background: var(--dark); color: #fff; font-size: 12px; font-weight: 700; }
 
 /* 직원 목록 (사무실 아래, 6명이 한눈에) */
-.staff-list { list-style: none; margin: 0; padding: 6px; overflow: auto; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px 6px; align-content: start; }
+.staff-list { list-style: none; margin: 0; padding: 5px 6px; overflow: auto; flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px 6px; align-content: start; }
 .staff .card-h { padding: 8px 12px; }
 .staff-item .mini { width: 34px; height: 34px; }
-.staff-item { padding: 5px 7px; gap: 8px; }
+.staff-item { padding: 5px 7px; gap: 8px; height: 50px; }
 .staff-item b { font-size: 13px; }
 .staff-item { display: flex; gap: 10px; align-items: center; padding: 8px; border-radius: 14px; cursor: pointer; border: 1.5px solid transparent; }
 .staff-item:hover { background: #fcf7f9; }
@@ -75,7 +75,7 @@ button, input { font: inherit; }
 
 /* 사무실 장면 (3:2) */
 .scene-wrap { position: relative; min-height: 0; background: #fbf4f6; border-radius: 18px; border: 1px solid var(--line); overflow: hidden; }
-.scene { position: relative; aspect-ratio: 3 / 2; width: 100%; container-type: inline-size; }
+.scene { position: relative; aspect-ratio: 3 / 2; width: 100%; container-type: inline-size; isolation: isolate; }
 .bg, .bg svg, .bg img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; object-fit: cover; }
 .furniture { pointer-events: none; }
 .layer { position: absolute; inset: 0; }
@@ -84,9 +84,9 @@ button, input { font: inherit; }
 @keyframes tw { 50% { opacity: .35; } }
 
 .desk, .chair, .tag, .char { position: absolute; transform: translate(-50%, -50%); cursor: pointer; }
-.desk { width: 19%; }
+.desk { width: calc(19% * var(--sc, 1)); }
 .desk svg, .chair svg { width: 100%; display: block; }
-.chair { width: 7%; }
+.chair { width: calc(7% * var(--sc, 1)); }
 .desk.on .mon-glow { opacity: .85; animation: glow 1.6s ease-in-out infinite; }
 @keyframes glow { 50% { opacity: .45; } }
 .desk.sel { filter: drop-shadow(0 0 6px rgba(255, 143, 171, .6)); }
@@ -97,7 +97,7 @@ button, input { font: inherit; }
 .d-waiting { background: var(--amber); }
 .d-off { background: #ddd; }
 
-.char { width: 16%; transform: translate(-50%, -100%); transition: left 1.3s cubic-bezier(.45,.05,.35,1), top 1.3s cubic-bezier(.45,.05,.35,1), opacity .5s; }
+.char { width: calc(16% * var(--sc, 1)); transform: translate(-50%, -100%); transition: left 1.3s cubic-bezier(.45,.05,.35,1), top 1.3s cubic-bezier(.45,.05,.35,1), opacity .5s; }
 .char .ch-img svg, .char .ch-img img { width: 100%; display: block; }
 .char .ch-img img { aspect-ratio: 1; object-fit: contain; }
 .char.s-off { opacity: 0; pointer-events: none; }
@@ -204,3 +204,21 @@ button, input { font: inherit; }
 .file { cursor: pointer; }
 .si-top { display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; }
 .si-top b { overflow: hidden; text-overflow: ellipsis; }
+
+/* 직원 관리 */
+#cEngine { cursor: pointer; }
+#cEngine:hover { border-color: var(--pink); color: var(--ink); }
+.mg-box { width: min(680px, 100%); max-height: min(88vh, 860px); }
+.mg-list { overflow: auto; padding: 0 12px 8px; display: flex; flex-direction: column; gap: 6px; min-height: 80px; }
+.mg-row { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border: 1px solid var(--line); border-radius: 12px; }
+.mg-name { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.mg-name small { color: var(--muted); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mg-row select, .mg-form select, .mg-form input, .mg-form textarea { font: inherit; border: 1px solid var(--line); border-radius: 9px; padding: 6px 8px; background: #fff; outline: none; }
+.mg-row select:focus, .mg-form input:focus, .mg-form select:focus, .mg-form textarea:focus { border-color: var(--pink); }
+.mg-lead { width: 52px; text-align: center; }
+.mg-form { border-top: 1px solid var(--line); padding: 12px 16px 14px; display: flex; flex-direction: column; gap: 10px; }
+.mg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; }
+.mg-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+.mg-grid label.wide { grid-column: 1 / -1; }
+.mg-grid textarea { resize: vertical; }
+.mg-f { display: flex; align-items: center; gap: 8px; }

@@ -38,7 +38,7 @@ for (const d of [SHARED, DATA]) fs.mkdirSync(d, { recursive: true });
 // ---------- 상태 ----------
 const agents = {}; // id -> { cfg, dir, off, current, queue, lastLine, log }
 const order = [];
-for (const a of CFG.agents) {
+function setupAgent(a) {
   const dir = path.join(AGENTS_DIR, a.id);
   for (const sub of ['inbox', 'done', 'output', 'shared']) fs.mkdirSync(path.join(dir, sub), { recursive: true });
   // role.md(원본) → 엔진별 설명서 파일(CLAUDE.md / AGENTS.md / GEMINI.md)로 복사. role.local.md 가 있으면 그걸 우선 사용
@@ -48,6 +48,57 @@ for (const a of CFG.agents) {
   agents[a.id] = { cfg: a, dir, off: false, current: null, queue: [], lastLine: '', log: [] };
   order.push(a.id);
 }
+for (const a of CFG.agents) if (!a.removed) setupAgent(a);
+
+// ---------- 내 설정 파일 (agents.local.json) 읽기/쓰기 ----------
+const LOCAL_PATH = path.join(ROOT, 'agents.local.json');
+function readLocal() {
+  try { return JSON.parse(fs.readFileSync(LOCAL_PATH, 'utf8')); } catch (e) {
+    if (e.code === 'ENOENT') return {};
+    throw new Error('agents.local.json 파일 형식이 잘못돼 저장하지 못했어요');
+  }
+}
+function updateLocalAgent(id, patch) {
+  const local = readLocal();
+  local.agents = Array.isArray(local.agents) ? local.agents : [];
+  let entry = local.agents.find((x) => x.id === id);
+  if (!entry) { entry = { id }; local.agents.push(entry); }
+  if (patch === null) local.agents = local.agents.filter((x) => x.id !== id);
+  else Object.assign(entry, patch);
+  fs.writeFileSync(LOCAL_PATH, JSON.stringify(local, null, 2));
+}
+
+// ---------- 설치된 AI 확인 ----------
+const engineAvail = {};
+function checkEngine(key) {
+  const e = CFG.engines[key];
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (v) => { if (!done) { done = true; engineAvail[key] = v; resolve(v); } };
+    try {
+      const c = spawn(e.cmd, ['--version'], { shell: IS_WIN, windowsHide: true });
+      c.on('error', () => finish(false));
+      c.on('close', (code) => finish(code === 0));
+      setTimeout(() => { try { c.kill(); } catch {} finish(false); }, 20000);
+    } catch { finish(false); }
+  });
+}
+Object.keys(CFG.engines).forEach(checkEngine);
+const enginesInfo = () => Object.entries(CFG.engines).map(([key, e]) => ({ key, label: e.label || key, available: MOCK ? true : engineAvail[key] }));
+const CHAR_TYPES = ['bunny', 'bear', 'cat', 'dog', 'hamster', 'chick'];
+const ROLE_TEMPLATE = (name, role, details) => `# 역할: ${name}
+
+너는 AI 오피스의 ${name}다. ${role}
+
+## 하는 일
+- ${role}
+${details ? '\n## 자세한 업무 설명\n' + details + '\n' : ''}
+## 결과물 기준
+- 결과는 반드시 output/ 폴더에 파일로 저장한다.
+- 결론부터, 짧고 쉬운 말로 보고한다.
+- 사실과 추측을 구분한다. 확인하지 못한 것은 확인하지 못했다고 쓴다.
+- 게시, 발송, 결제, 배포처럼 밖으로 나가는 일은 하지 않고 대표님께 보고만 한다.
+`;
 
 const jobs = {};
 let chat = [];
@@ -628,7 +679,7 @@ async function handle(req, res) {
   if (p === '/api/state') {
     const bg = backgroundUrl();
     return json(res, {
-      lead: LEAD, mock: MOCK, background: bg, ffmpeg: HAS_FFMPEG,
+      lead: LEAD, mock: MOCK, background: bg, ffmpeg: HAS_FFMPEG, engines: enginesInfo(), charTypes: CHAR_TYPES,
       agents: order.map(snapshot),
       logs: Object.fromEntries(order.map((id) => [id, agents[id].log.slice(-200)])),
       chat: chat.slice(-200),
@@ -741,6 +792,64 @@ async function handle(req, res) {
     }
     pushAgent(im[1]);
     return json(res, { ok: true });
+  }
+  // 직원 추가
+  if (p === '/api/agents' && req.method === 'POST') {
+    const body = await readBody(req);
+    const clean = (v, n) => String(v || '').replace(/[<>"'`@\\/{}\[\]]/g, '').replace(/\s+/g, ' ').trim().slice(0, n);
+    const name = clean(body.name, 10), nick = clean(body.nickname, 12), role = clean(body.role, 80);
+    const details = String(body.details || '').slice(0, 3000).trim();
+    const engine = CFG.engines[body.engine] ? body.engine : 'codex';
+    if (!name || !nick || !role) return json(res, { error: '직군, 이름, 하는 일을 모두 적어 주세요' }, 400);
+    if (order.length >= 12) return json(res, { error: '직원은 12명까지 둘 수 있어요' }, 400);
+    if (order.some((x) => agents[x].cfg.nickname === nick)) return json(res, { error: `'${nick}'은(는) 이미 있는 이름이에요` }, 400);
+    const id = 'staff-' + Date.now().toString(36);
+    const type = CHAR_TYPES.includes(body.type) ? body.type : CHAR_TYPES[order.length % CHAR_TYPES.length];
+    const palette = [['#ffffff', '#ffb3c7'], ['#f3dcc0', '#ff9fb2'], ['#fff7ec', '#ffb08a'], ['#fff1a8', '#ffb3a0'], ['#e8f4ff', '#9fd0ff'], ['#f0ffe9', '#9fe0a8']];
+    const [color, accent] = palette[order.length % palette.length];
+    const cfg = { id, name, nickname: nick, engine, role, prop: clean(body.prop, 4) || '⭐', character: { type, color, accent }, custom: true, allowTools: [], extraArgs: [] };
+    const dir = path.join(AGENTS_DIR, id);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'role.local.md'), ROLE_TEMPLATE(name, role, details));
+    try { updateLocalAgent(id, cfg); } catch (e) { return json(res, { error: e.message }, 500); }
+    setupAgent(cfg);
+    addChat({ from: 'system', text: `새 직원 ${name} ${nick} 입사! 🎉 (${CFG.engines[engine].label})` });
+    emit('roster', {});
+    return json(res, { ok: true, id });
+  }
+  // 직원 삭제 (비서는 삭제 불가)
+  const dm = p.match(/^\/api\/agents\/([a-z0-9_-]+)$/);
+  if (dm && req.method === 'DELETE') {
+    const id = dm[1], a = agents[id];
+    if (!a) return json(res, { error: '없는 직원이에요' }, 404);
+    if (id === LEAD) return json(res, { error: '비서(팀 리더)는 삭제할 수 없어요. AI나 이름은 바꿀 수 있어요' }, 400);
+    if (a.current) return json(res, { error: '일하는 중이에요. 끝나거나 중지한 뒤에 삭제해 주세요' }, 400);
+    for (const t of a.queue) jobs[t.jobId]?.open.delete(t.id);
+    const label = nameOf(id);
+    try { updateLocalAgent(id, a.cfg.custom ? null : { removed: true }); } catch (e) { return json(res, { error: e.message }, 500); }
+    delete agents[id];
+    order.splice(order.indexOf(id), 1);
+    addChat({ from: 'system', text: `${label} 퇴사했어요 👋 (작업 폴더와 결과물은 그대로 남아 있어요)` });
+    emit('roster', {});
+    return json(res, { ok: true });
+  }
+  // 직원이 쓰는 AI 바꾸기
+  const em = p.match(/^\/api\/agent\/([a-z0-9_-]+)\/engine$/);
+  if (em && agents[em[1]] && req.method === 'POST') {
+    const body = await readBody(req);
+    const key = String(body.engine || '');
+    if (!CFG.engines[key]) return json(res, { error: '알 수 없는 AI예요' }, 400);
+    const a = agents[em[1]];
+    if (a.cfg.engine === key) return json(res, { ok: true });
+    try { updateLocalAgent(em[1], { engine: key }); } catch (e) { return json(res, { error: e.message }, 500); }
+    a.cfg.engine = key;
+    addChat({ from: 'system', text: `${nameOf(em[1])}의 AI를 ${CFG.engines[key].label}(으)로 바꿨어요${a.current ? ' (지금 하는 일이 끝난 뒤부터 적용)' : ''}` });
+    pushAgent(em[1]);
+    return json(res, { ok: true });
+  }
+  if (p === '/api/engines' && req.method === 'POST') {
+    await Promise.all(Object.keys(CFG.engines).map(checkEngine));
+    return json(res, { engines: enginesInfo() });
   }
   // 직원 이름(별명) 바꾸기 — agents.local.json 에 저장되어 업데이트해도 유지됨
   const nm = p.match(/^\/api\/agent\/([a-z0-9_-]+)\/nickname$/);

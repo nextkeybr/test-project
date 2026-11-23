@@ -73,6 +73,7 @@
         <b>직원</b><span class="muted" id="attend">출근 0 / 0</span>
         <span class="grow"></span>
         <button class="btn sm upd hidden" id="updBtn"></button>
+        <button class="btn sm" id="mgBtn">⚙️ 직원 관리</button>
         <button class="btn sm" id="allOn">전체 출근</button>
         <button class="btn sm" id="allOff">전체 퇴근</button>
       </header>
@@ -94,6 +95,25 @@
       <span class="grow"></span>
       <button type="button" class="btn dark" id="pkOk">선택 완료</button>
     </div>
+  </div>
+</div>
+<div id="mgr" class="modal hidden">
+  <div class="modal-box mg-box">
+    <div class="modal-h"><b>직원 관리</b><span class="muted small" id="mgCount"></span><span class="grow"></span><button type="button" class="btn sm" id="mgClose">닫기</button></div>
+    <p class="muted small pk-note">AI를 고르면 바로 적용돼요. 다음에 받는 업무부터 그 AI로 일합니다.</p>
+    <div id="mgList" class="mg-list"></div>
+    <form id="mgForm" class="mg-form">
+      <b>+ 새 직원 뽑기</b>
+      <div class="mg-grid">
+        <label>직군<input name="name" maxlength="10" placeholder="예: 편집자" required></label>
+        <label>이름<input name="nickname" maxlength="12" placeholder="예: 모몽가" required></label>
+        <label class="wide">하는 일 (한 줄)<input name="role" maxlength="80" placeholder="예: 쇼츠 대본을 컷 단위 편집 지시서로 정리" required></label>
+        <label>AI<select name="engine" id="mgEngine"></select></label>
+        <label>기본 캐릭터<select name="type" id="mgType"></select></label>
+        <label class="wide">자세한 업무 설명 (선택)<textarea name="details" rows="3" maxlength="3000" placeholder="원하는 결과물 형식, 말투, 지켜야 할 규칙 등을 적어 주세요. 비워 두면 기본 규칙으로 일해요."></textarea></label>
+      </div>
+      <div class="mg-f"><span class="muted small">캐릭터 이미지는 뽑은 뒤 캐릭터에 끌어다 놓아 바꿀 수 있어요.</span><span class="grow"></span><button class="btn dark">뽑기</button></div>
+    </form>
   </div>
 </div>
 <script src="characters.js"></script>
