@@ -12,3 +12,6 @@ public/characters/*
 public/office-bg.*
 agents.local.json
 agents/*/role.local.md
+runtime/
+install-log.txt
+AI-Office.bat
