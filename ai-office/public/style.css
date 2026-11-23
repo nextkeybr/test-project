@@ -171,3 +171,11 @@ button, input { font: inherit; }
 /* 이름 바꾸기 */
 .nick-edit { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; }
 .nick-edit input { width: 120px; border: 1.5px solid var(--pink); border-radius: 8px; padding: 4px 8px; outline: none; }
+
+/* 첨부 미리보기 */
+.file.thumb { display: inline-flex; flex-direction: column; gap: 3px; padding: 4px; border-radius: 12px; max-width: 150px; vertical-align: top; }
+.file.thumb img { width: 140px; height: 96px; object-fit: cover; border-radius: 8px; background: #f6eef1; display: block; }
+.file.thumb span { font-size: 11px; padding: 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat.drop-on, .console.drop-on { outline: 3px dashed var(--pink); outline-offset: -3px; }
+.staff .card-h { flex-wrap: wrap; row-gap: 6px; }
+.staff .card-h b, #attend { white-space: nowrap; }

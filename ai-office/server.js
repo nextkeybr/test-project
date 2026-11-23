@@ -222,8 +222,8 @@ function attachmentsText(list) {
   let budget = 60000;
   for (const rel of list) {
     const meta = filesMeta[rel] || {};
-    const by = meta.by ? ` — 만든 사람: ${nameOf(meta.by)}` : '';
-    const req = meta.request ? ` (요청: "${meta.request}")` : '';
+    const by = meta.by === 'me' ? ' — 대표님이 올린 파일' : meta.by ? ` — 만든 사람: ${nameOf(meta.by)}` : '';
+    const req = meta.request && meta.by !== 'me' ? ` (요청: "${meta.request}")` : '';
     L.push(`### shared/${rel}${by}${req}`);
     const abs = path.join(SHARED, rel);
     if (TEXT_EXT.has(path.extname(rel).toLowerCase()) && budget > 0) {
@@ -234,7 +234,14 @@ function attachmentsText(list) {
         L.push('```', body, '```');
       } catch {}
     } else {
-      L.push('(이미지·기타 파일입니다. 필요하면 파일을 직접 열어 보세요.)');
+      let size = '';
+      try { const b = fs.statSync(abs).size; size = b < 1024 * 1024 ? ` · ${Math.max(1, Math.round(b / 1024))}KB` : ` · ${(b / 1024 / 1024).toFixed(1)}MB`; } catch {}
+      const k = kindOf(rel);
+      if (k === 'image') L.push(`(이미지 레퍼런스${size}. 이미지 보기 도구로 shared/${rel} 를 직접 열어 색감·구도·분위기를 확인하고 반영하세요.)`);
+      else if (k === 'video') L.push(`(영상 파일${size}. 직접 재생은 못 할 수 있으니, 파일 이름과 대표님 지시를 기준으로 작업하고 필요하면 확인 질문을 남기세요.)`);
+      else if (k === 'audio') L.push(`(음악/나레이션 파일${size}. 직접 들을 수 없으면 파일 이름과 대표님 지시를 기준으로 작업하세요.)`);
+      else if (rel.toLowerCase().endsWith('.pdf')) L.push(`(PDF 문서${size}. 파일을 직접 열어 읽으세요.)`);
+      else L.push(`(파일${size}. 필요하면 직접 열어 보세요.)`);
     }
     L.push('');
   }
@@ -494,7 +501,19 @@ const MIME = {
   '.json': 'application/json; charset=utf-8', '.md': 'text/plain; charset=utf-8', '.txt': 'text/plain; charset=utf-8',
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp',
   '.svg': 'image/svg+xml', '.pdf': 'application/pdf', '.mp4': 'video/mp4', '.mp3': 'audio/mpeg', '.csv': 'text/plain; charset=utf-8',
+  '.mov': 'video/quicktime', '.webm': 'video/webm', '.m4v': 'video/mp4', '.wav': 'audio/wav', '.m4a': 'audio/mp4',
+  '.aac': 'audio/aac', '.ogg': 'audio/ogg', '.flac': 'audio/flac', '.srt': 'text/plain; charset=utf-8', '.vtt': 'text/plain; charset=utf-8',
 };
+
+// 대표님이 올릴 수 있는 파일 종류 (실행 파일 등은 막음)
+const UPLOAD_KIND = {
+  image: ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.heic', '.svg', '.bmp'],
+  video: ['.mp4', '.mov', '.webm', '.m4v', '.avi', '.mkv'],
+  audio: ['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.flac'],
+  doc: ['.md', '.txt', '.pdf', '.csv', '.json', '.srt', '.vtt', '.html', '.docx', '.xlsx', '.pptx', '.hwp'],
+};
+const kindOf = (f) => Object.keys(UPLOAD_KIND).find((k) => UPLOAD_KIND[k].includes(path.extname(f).toLowerCase())) || null;
+const MAX_UPLOAD = 2 * 1024 * 1024 * 1024; // 2GB
 
 function safeJoin(base, rel) {
   let dec;
@@ -571,6 +590,37 @@ async function handle(req, res) {
     addChat({ from: 'me', to, text, files: attachments });
     createJob(to, text, attachments);
     return json(res, { ok: true, to });
+  }
+  // 대표님 파일 올리기 (채팅에 끌어다 놓기) → shared/uploads/날짜/파일명
+  if (p === '/api/upload' && req.method === 'POST') {
+    let name = '';
+    try { name = decodeURIComponent(String(req.headers['x-file-name'] || '')); } catch {}
+    name = path.basename(name).replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/^\.+/, '').trim().slice(-100);
+    if (!name || !kindOf(name)) return json(res, { error: '이미지, 영상, 음악·나레이션, 문서(md·txt·pdf 등)만 올릴 수 있어요' }, 400);
+    const len = Number(req.headers['content-length'] || 0);
+    if (len > MAX_UPLOAD) return json(res, { error: '2GB 이하 파일만 올릴 수 있어요' }, 400);
+    const d = new Date();
+    const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const dir = path.join(SHARED, 'uploads', day);
+    fs.mkdirSync(dir, { recursive: true });
+    const ext = path.extname(name), stem = name.slice(0, name.length - ext.length);
+    let fname = name, n = 2;
+    while (fs.existsSync(path.join(dir, fname))) fname = `${stem}-${n++}${ext}`;
+    const abs = path.join(dir, fname);
+    await new Promise((resolve, reject) => {
+      const out = fs.createWriteStream(abs);
+      let size = 0;
+      req.on('data', (c) => { size += c.length; if (size > MAX_UPLOAD) { req.destroy(); out.destroy(); reject(new Error('too big')); } });
+      req.pipe(out);
+      out.on('finish', resolve);
+      out.on('error', reject);
+      req.on('error', reject);
+    }).catch((e) => { try { fs.unlinkSync(abs); } catch {} throw e; });
+    const rel = `uploads/${day}/${fname}`;
+    filesMeta[rel] = { by: 'me', jobId: `upload-${day}`, request: `대표님이 올린 파일 (${day})`, time: Date.now() };
+    saveMeta();
+    emit('files', filesWithMeta());
+    return json(res, { ok: true, path: rel, kind: kindOf(rel) });
   }
   // 캐릭터 이미지 바꾸기 (화면에 끌어다 놓기)
   const im = p.match(/^\/api\/agent\/([a-z0-9_-]+)\/image$/);

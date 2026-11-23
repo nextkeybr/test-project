@@ -29,7 +29,7 @@
       <div id="chatAtt" class="att-chips hidden"></div>
       <form id="chatForm" class="chat-form">
         <button type="button" class="btn clip" data-for="chat" title="이어서 할 자료 고르기">📎</button>
-        <input id="chatInput" autocomplete="off" placeholder="비서에게 지시하기 — @기획자 처럼 이름을 붙이면 그 직원에게">
+        <input id="chatInput" autocomplete="off" placeholder="비서에게 지시 (파일은 끌어다 놓기)">
         <button class="btn dark">보내기</button>
       </form>
     </section>
@@ -62,12 +62,13 @@
       <div id="cAtt" class="att-chips hidden"></div>
       <form id="cForm" class="console-form">
         <button type="button" class="btn clip" data-for="c" title="이어서 할 자료 고르기">📎</button>
-        <input id="cInput" autocomplete="off" placeholder="이 직원에게 직접 지시하기 — Enter">
+        <input id="cInput" autocomplete="off" placeholder="이 직원에게 직접 지시 (파일은 끌어다 놓기)">
         <button class="btn dark">보내기</button>
       </form>
     </section>
   </main>
 </div>
+<input type="file" id="upPick" multiple hidden accept="image/*,video/*,audio/*,.md,.txt,.pdf,.csv,.json,.srt,.vtt,.html,.docx,.xlsx,.pptx,.hwp,.heic,.mkv">
 <input type="file" id="imgPick" accept="image/png,image/webp,image/gif,image/jpeg" hidden>
 <div id="toast" class="toast"></div>
 <div id="picker" class="modal hidden">
@@ -76,6 +77,7 @@
     <p id="pkNote" class="muted small pk-note">지난 작업 결과물을 골라 주세요. 여러 개를 고를 수 있어요.</p>
     <div id="pkList" class="pk-list"></div>
     <div class="modal-f">
+      <button type="button" class="btn" id="pkUpload">💻 내 컴퓨터에서 올리기</button>
       <button type="button" class="btn" id="pkSkip">고르지 않고 보내기</button>
       <span class="grow"></span>
       <button type="button" class="btn dark" id="pkOk">선택 완료</button>

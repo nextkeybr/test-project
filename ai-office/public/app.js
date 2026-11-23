@@ -106,8 +106,15 @@ function renderStaff() {
 }
 
 // ---------- 채팅 / 파일 ----------
+const EXT_KIND = { image: /\.(png|jpe?g|webp|gif|svg|bmp)$/i, video: /\.(mp4|mov|webm|m4v|avi|mkv)$/i, audio: /\.(mp3|wav|m4a|aac|ogg|flac)$/i };
+const ICON = { image: '🖼', video: '🎬', audio: '🎵' };
+const kindOfName = (f) => Object.keys(EXT_KIND).find((k) => EXT_KIND[k].test(f)) || 'doc';
+const fileUrl = (f) => `/files/${f.split('/').map(encodeURIComponent).join('/')}`;
+const shortName = (f) => f.split('/').pop();
 function fileChip(f) {
-  return `<a class="file" href="/files/${f.split('/').map(encodeURIComponent).join('/')}" target="_blank">📎 ${esc(f)}</a>`;
+  const k = kindOfName(f);
+  if (k === 'image' && !/\.heic$/i.test(f)) return `<a class="file thumb" href="${fileUrl(f)}" target="_blank" title="${esc(f)}"><img src="${fileUrl(f)}" alt="" loading="lazy"><span>${esc(shortName(f))}</span></a>`;
+  return `<a class="file" href="${fileUrl(f)}" target="_blank" title="${esc(f)}">${ICON[k] || '📄'} ${esc(shortName(f))}</a>`;
 }
 function chatItem(m) {
   if (m.from === 'system') return `<div class="msg sys">${esc(m.text)}</div>`;
@@ -151,7 +158,7 @@ function renderConsole(scroll) {
   $('#cEngine').textContent = a.engineLabel;
   $('#cToggle').textContent = a.off ? '출근' : '퇴근';
   $('#cStop').disabled = a.status !== 'working';
-  $('#cInput').placeholder = `${a.name}에게 직접 지시하기 — Enter`;
+  $('#cInput').placeholder = `${a.name}에게 직접 지시 (파일은 끌어다 놓기)`;
   if (scroll) {
     const pre = $('#cLog');
     pre.textContent = (S.logs[a.id] || []).join('\n') || `${fullName(a)}의 작업 화면입니다. 업무를 주면 여기에 실시간으로 보여요.`;
@@ -220,7 +227,7 @@ function dayLabel(t) {
 function renderAtt(k) {
   const box = $(FORM[k].chips);
   box.classList.toggle('hidden', !ATT[k].length);
-  box.innerHTML = ATT[k].map((f, i) => `<span class="att"><span>📎 ${esc(f)}</span><button type="button" data-i="${i}" title="빼기">×</button></span>`).join('');
+  box.innerHTML = ATT[k].map((f, i) => `<span class="att"><span>${ICON[kindOfName(f)] || '📄'} ${esc(shortName(f))}</span><button type="button" data-i="${i}" title="빼기">×</button></span>`).join('');
   box.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { ATT[k].splice(+b.dataset.i, 1); renderAtt(k); }));
 }
 async function submitFrom(k) {
@@ -253,23 +260,24 @@ function groupFiles() {
     g.files.push(f);
     g.time = Math.max(g.time, f.time || f.mtime);
     if (f.by && S.agents[f.by]) g.by.add(S.agents[f.by].name);
+    if (f.by === 'me') g.by.add('나');
   }
   return [...groups.values()].sort((a, b) => b.time - a.time);
 }
 function openPicker(k, sendAfter, note) {
-  if (!S.files.length) return toast('아직 결과물이 없어요');
+  PK_LAST = k;
   PK = { k, sendAfter, groups: groupFiles() };
   const chosen = new Set(ATT[k]);
   $('#pkNote').textContent = note || '지난 작업 결과물을 골라 주세요. 여러 개를 고를 수 있어요.';
   $('#pkSkip').classList.toggle('hidden', !sendAfter);
-  $('#pkList').innerHTML = PK.groups.map((g, gi) => `
+  $('#pkList').innerHTML = (PK.groups.length ? '' : '<div class="empty">아직 결과물이 없어요.<br>아래 "내 컴퓨터에서 올리기"로 파일을 올려 보세요.</div>') + PK.groups.map((g, gi) => `
     <div class="pk-group">
       <label class="pk-gh"><input type="checkbox" class="gcb" data-g="${gi}">
         <div><b>${g.title === '기타 파일' ? '기타 파일' : '“' + esc(g.title) + '”'}</b>
         <small>${dayLabel(g.time)} · ${[...g.by].map(esc).join(', ') || '직원'} · 파일 ${g.files.length}개</small></div></label>
       <div class="pk-files">${g.files.sort((a, b) => a.path.localeCompare(b.path)).map((f) => `
         <label><input type="checkbox" class="fcb" data-g="${gi}" value="${esc(f.path)}" ${chosen.has(f.path) ? 'checked' : ''}>
-        <span>${esc(f.path)}</span><small>${f.by && S.agents[f.by] ? esc(S.agents[f.by].name) : ''}</small></label>`).join('')}
+        <span>${ICON[kindOfName(f.path)] || '📄'} ${esc(f.path.startsWith('uploads/') ? shortName(f.path) : f.path)}</span><small>${f.by === 'me' ? '나' : f.by && S.agents[f.by] ? esc(S.agents[f.by].name) : ''}</small></label>`).join('')}
       </div>
     </div>`).join('');
   const sync = () => {
@@ -293,6 +301,19 @@ function openPicker(k, sendAfter, note) {
 }
 function closePicker() { $('#picker').classList.add('hidden'); PK = null; }
 document.querySelectorAll('.clip').forEach((b) => b.addEventListener('click', () => openPicker(b.dataset.for)));
+$('#pkUpload').addEventListener('click', () => $('#upPick').click());
+$('#upPick').addEventListener('change', (e) => {
+  const files = [...e.target.files];
+  e.target.value = '';
+  if (!files.length || !PK) return;
+  const { k, sendAfter } = PK;
+  // 이미 체크한 결과물도 같이 붙임
+  const checked = [...document.querySelectorAll('.fcb:checked')].map((b) => b.value);
+  ATT[k] = [...new Set([...ATT[k], ...checked])];
+  renderAtt(k);
+  closePicker();
+  uploadFiles(k, files).then(() => { if (sendAfter) sendAfter(); });
+});
 $('#pkClose').addEventListener('click', closePicker);
 $('#picker').addEventListener('click', (e) => { if (e.target.id === 'picker') closePicker(); });
 $('#pkOk').addEventListener('click', () => {
@@ -376,15 +397,15 @@ $('#cImg').addEventListener('click', (e) => {
 document.addEventListener('click', closeMenu);
 
 // 이미지 파일을 직원 목록이나 캐릭터, 책상 위에 끌어다 놓으면 바로 바뀜
-function dropTargetId(el) {
-  const t = el.closest?.('.staff-item, .char, .desk, .chair, .tag, .console');
-  if (!t) return null;
-  return t.classList.contains('console') ? S.selected : t.dataset.id;
+const CHAR_SEL = '.staff-item, .char, .desk, .chair, .tag';
+function attachKeyFor(el) {
+  if (el.closest?.('.console')) return 'c';
+  return 'chat';
 }
 let lastDrop = null;
 document.addEventListener('dragover', (e) => {
   e.preventDefault();
-  const t = e.target.closest?.('.staff-item, .char, .desk, .chair, .tag, .console');
+  const t = e.target.closest?.(CHAR_SEL) || e.target.closest?.('.chat, .console');
   if (lastDrop && lastDrop !== t) lastDrop.classList.remove('drop-on');
   if (t) { t.classList.add('drop-on'); lastDrop = t; }
 });
@@ -392,12 +413,46 @@ document.addEventListener('dragleave', (e) => { if (!e.relatedTarget && lastDrop
 document.addEventListener('drop', (e) => {
   e.preventDefault();
   if (lastDrop) lastDrop.classList.remove('drop-on');
-  const id = dropTargetId(e.target);
-  const f = e.dataTransfer.files[0];
-  if (!f) return;
-  if (!id) return toast('직원 목록이나 캐릭터 위에 놓아 주세요');
-  uploadImage(id, f, e.shiftKey);
+  const files = [...(e.dataTransfer?.files || [])];
+  if (!files.length) return;
+  if (!$('#picker').classList.contains('hidden')) { closePicker(); return uploadFiles(PK_LAST || 'chat', files); }
+  const charEl = e.target.closest?.(CHAR_SEL);
+  // 캐릭터·직원 목록 위에 이미지 1장 → 캐릭터 바꾸기
+  if (charEl && files.length === 1 && /^image\//.test(files[0].type)) return uploadImage(charEl.dataset.id, files[0], e.shiftKey);
+  // 그 밖(채팅, 아래 작업 창, 사무실 바닥) → 업무 자료로 첨부
+  uploadFiles(attachKeyFor(e.target), files);
 });
+
+// 내 컴퓨터 파일 올리기 → 첨부 목록에 추가
+let PK_LAST = 'chat';
+function uploadOne(file, onProgress) {
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/upload');
+    xhr.setRequestHeader('X-Office', '1');
+    xhr.setRequestHeader('X-File-Name', encodeURIComponent(file.name));
+    xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+    xhr.upload.onprogress = (ev) => ev.lengthComputable && onProgress(Math.round((ev.loaded / ev.total) * 100));
+    xhr.onload = () => { let j = {}; try { j = JSON.parse(xhr.responseText); } catch {} resolve(j); };
+    xhr.onerror = () => resolve({ error: '올리기 실패 (연결 끊김)' });
+    xhr.send(file);
+  });
+}
+async function uploadFiles(k, files) {
+  let ok = 0;
+  for (const f of files) {
+    toast(`올리는 중: ${f.name}`);
+    const j = await uploadOne(f, (pct) => toast(`올리는 중: ${f.name} ${pct}%`));
+    if (j.error) { toast(`${f.name}: ${j.error}`); await new Promise((r) => setTimeout(r, 1800)); continue; }
+    if (!ATT[k].includes(j.path)) ATT[k].push(j.path);
+    ok++;
+    renderAtt(k);
+  }
+  if (ok) {
+    toast(`${ok}개 첨부했어요. 지시를 적고 보내기를 누르세요 📎`);
+    $(FORM[k].input).focus();
+  }
+}
 
 // ---------- 업데이트 ----------
 async function checkVersion() {
@@ -405,7 +460,8 @@ async function checkVersion() {
     const v = await (await fetch('/api/version')).json();
     const b = $('#updBtn');
     b.title = `현재 버전 ${v.current}`;
-    if (v.latest && v.latest !== v.current && v.canUpdate) {
+    const newer = (a, b) => { const x = a.split('.').map(Number), y = b.split('.').map(Number); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); } return false; };
+    if (v.latest && v.current !== 'dev' && newer(v.latest, v.current) && v.canUpdate) {
       b.classList.remove('hidden');
       b.textContent = '✨ 새 버전 업데이트';
     }
