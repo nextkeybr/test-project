@@ -68,7 +68,7 @@ function updateScene(id, instant) {
   e.desk.classList.toggle('sel', S.selected === id);
   const key = `${a.status === 'working'}|${a.image}|${a.workImage}`;
   if (e.imgKey !== key) { e.ch.querySelector('.ch-img').innerHTML = avatar(a, a.status === 'working'); e.imgKey = key; }
-  e.tag.innerHTML = `<i class="dot d-${a.status}"></i>${esc(a.name)}${a.queue ? ` <small>+${a.queue}</small>` : ''}`;
+  e.tag.innerHTML = `<i class="dot d-${a.status}"></i>${esc(fullName(a))}${a.queue ? ` <small>+${a.queue}</small>` : ''}`;
   const b = e.ch.querySelector('.bubble');
   let text = '';
   if (a.status === 'working') text = a.lastLine || '일하는 중...';
@@ -136,6 +136,7 @@ function renderFiles() {
 // ---------- 하단 터미널 ----------
 function select(id) {
   S.selected = id;
+  nickEditing(false);
   renderStaff();
   S.order.forEach((x) => updateScene(x));
   renderConsole(true);
@@ -418,6 +419,34 @@ $('#updBtn').addEventListener('click', async () => {
   const j = await api('/api/update');
   if (j.error) { b.disabled = false; b.textContent = '✨ 새 버전 업데이트'; return; }
   b.textContent = '다시 여는 중...';
+});
+
+// ---------- 이름 바꾸기 ----------
+function nickEditing(on) {
+  $('#cName').classList.toggle('hidden', on);
+  $('#cNickBtn').classList.toggle('hidden', on);
+  $('#cNickEdit').classList.toggle('hidden', !on);
+}
+$('#cNickBtn').addEventListener('click', () => {
+  const a = S.agents[S.selected];
+  if (!a) return;
+  $('#cJob').textContent = a.name;
+  $('#cNickInput').value = a.nickname || '';
+  nickEditing(true);
+  $('#cNickInput').focus();
+  $('#cNickInput').select();
+});
+async function saveNick() {
+  const v = $('#cNickInput').value.trim();
+  if (!v) return toast('이름을 입력해 주세요');
+  const j = await api(`/api/agent/${S.selected}/nickname`, { nickname: v });
+  if (!j.error) nickEditing(false);
+}
+$('#cNickSave').addEventListener('click', saveNick);
+$('#cNickCancel').addEventListener('click', () => nickEditing(false));
+$('#cNickInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); saveNick(); }
+  if (e.key === 'Escape') nickEditing(false);
 });
 
 init();

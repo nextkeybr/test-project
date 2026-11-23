@@ -590,6 +590,30 @@ async function handle(req, res) {
     pushAgent(im[1]);
     return json(res, { ok: true });
   }
+  // 직원 이름(별명) 바꾸기 — agents.local.json 에 저장되어 업데이트해도 유지됨
+  const nm = p.match(/^\/api\/agent\/([a-z0-9_-]+)\/nickname$/);
+  if (nm && agents[nm[1]] && req.method === 'POST') {
+    const body = await readBody(req);
+    const nick = String(body.nickname || '').replace(/[<>"'`@\\/{}\[\]]/g, '').replace(/\s+/g, ' ').trim().slice(0, 12);
+    if (!nick) return json(res, { error: '이름을 입력해 주세요' }, 400);
+    const clash = order.find((x) => x !== nm[1] && (agents[x].cfg.nickname === nick || agents[x].cfg.name === nick));
+    if (clash) return json(res, { error: `'${nick}'은(는) 이미 다른 직원 이름이에요` }, 400);
+    const localPath = path.join(ROOT, 'agents.local.json');
+    let local = {};
+    try { local = JSON.parse(fs.readFileSync(localPath, 'utf8')); } catch (e) {
+      if (e.code !== 'ENOENT') return json(res, { error: 'agents.local.json 파일 형식이 잘못돼 저장하지 못했어요' }, 500);
+    }
+    local.agents = Array.isArray(local.agents) ? local.agents : [];
+    let entry = local.agents.find((x) => x.id === nm[1]);
+    if (!entry) { entry = { id: nm[1] }; local.agents.push(entry); }
+    entry.nickname = nick;
+    fs.writeFileSync(localPath, JSON.stringify(local, null, 2));
+    const before = nameOf(nm[1]);
+    agents[nm[1]].cfg.nickname = nick;
+    addChat({ from: 'system', text: `${before} → ${nameOf(nm[1])} 로 이름을 바꿨어요 ✏️` });
+    pushAgent(nm[1]);
+    return json(res, { ok: true });
+  }
   const am = p.match(/^\/api\/agent\/([a-z0-9_-]+)\/(toggle|stop|clear)$/);
   if (am && req.method === 'POST') {
     const a = agents[am[1]];

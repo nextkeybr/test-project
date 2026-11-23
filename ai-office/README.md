@@ -100,6 +100,8 @@ irm https://raw.githubusercontent.com/nextkeybr/test-project/claude/ecstatic-lov
 
 ## 5. 직원 바꾸기 (업데이트해도 안 지워지는 방법)
 
+- **이름**: 직원을 클릭한 뒤 아래 터미널 창 위쪽의 **✏️ 이름** 버튼 → 새 이름 입력 → Enter. 직군(디자이너 등)은 그대로, 뒤 이름만 바뀝니다. 바꾼 이름으로 `@이름` 호출도 됩니다.
+
 - **성격·업무 규칙**: `agents/<직원id>/role.md` 를 복사해서 같은 폴더에 `role.local.md` 로 저장한 뒤 그 파일을 고칩니다.
 - **이름·AI·캐릭터 모양**: `AI-Office` 폴더에 `agents.local.json` 을 만들고 바꿀 것만 적습니다. 예:
 

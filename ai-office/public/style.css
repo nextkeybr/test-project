@@ -30,7 +30,7 @@ button, input { font: inherit; }
 .p-working { background: #e3f6ec; color: #2a9a63; }
 .p-waiting { background: #fff1dc; color: #c27f14; }
 .p-off { background: #ece8ea; color: #8d8287; }
-.eng { font-size: 10.5px; color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 0 5px; }
+.eng { white-space: nowrap; font-size: 10.5px; color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 0 5px; }
 
 .mini { width: 38px; height: 38px; flex: none; border-radius: 50%; background: #fff5f8; border: 1px solid var(--line); display: grid; place-items: center; overflow: hidden; }
 .mini svg, .mini img { width: 112%; height: 112%; object-fit: cover; margin-top: 6px; }
@@ -167,3 +167,7 @@ button, input { font: inherit; }
 .pk-files label span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pk-files small { color: var(--muted); margin-left: auto; white-space: nowrap; }
 .pk-gh input, .pk-files input { accent-color: var(--pink); width: 16px; height: 16px; flex: none; margin-top: 1px; }
+
+/* 이름 바꾸기 */
+.nick-edit { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; }
+.nick-edit input { width: 120px; border: 1.5px solid var(--pink); border-radius: 8px; padding: 4px 8px; outline: none; }
