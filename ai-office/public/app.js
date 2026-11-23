@@ -22,10 +22,14 @@ async function api(url, body) {
 
 // ---------- 사무실 장면 ----------
 const els = {};
+function setBackground(bg) {
+  S.background = bg || null;
+  $('#bg').innerHTML = bg ? `<img src="${esc(bg)}" alt="">` : officeRoom();
+}
 function buildScene(bg) {
   const layer = $('#layer');
-  if (bg) { $('#bg').innerHTML = `<img src="${esc(bg)}" alt="">`; $('#scene').classList.add('custom'); }
-  else $('#bg').innerHTML = officeBG();
+  setBackground(bg);
+  $('#furniture').innerHTML = officeFurniture();
   for (const id of S.order) {
     const a = S.agents[id];
     const chair = document.createElement('div');
@@ -44,9 +48,12 @@ function buildScene(bg) {
       el.addEventListener('click', () => select(id));
       layer.appendChild(el);
     }
-    place(chair, a.desk.x + 1.8, a.desk.y - 3.5);
+    place(chair, a.desk.x + 3.5, a.desk.y - 3.5);
     place(desk, a.desk.x, a.desk.y);
-    place(tag, a.desk.x, a.desk.y + 8.6);
+    place(tag, a.desk.x, a.desk.y + 6.7);
+    chair.style.zIndex = Math.round(a.desk.y * 10) - 100;
+    desk.style.zIndex = Math.round(a.desk.y * 10) + 40;
+    tag.style.zIndex = Math.round(a.desk.y * 10) + 41; // 앞줄 캐릭터의 말풍선보다는 아래
     els[id] = { chair, desk, tag, ch, imgKey: '' };
     updateScene(id, true);
   }
@@ -57,7 +64,8 @@ function updateScene(id, instant) {
   const a = S.agents[id], e = els[id];
   if (!e) return;
   const atDesk = a.status === 'working';
-  const pos = atDesk ? { x: a.desk.x + 1.8, y: a.desk.y + 0.2 } : a.rest;
+  const pos = atDesk ? { x: a.desk.x + 3.5, y: a.desk.y + 2.5 } : a.rest;
+  e.ch.style.zIndex = Math.round(pos.y * 10); // 아래쪽(앞쪽)에 있는 캐릭터가 위로 보이게
   if (instant) e.ch.style.transition = 'none';
   const moved = e.ch.style.left && (e.ch.style.left !== pos.x + '%' || e.ch.style.top !== pos.y + '%');
   place(e.ch, pos.x, pos.y);
@@ -95,10 +103,10 @@ function renderStaff() {
   $('#staffList').innerHTML = S.order.map((id) => {
     const a = S.agents[id];
     const line = a.status === 'working' ? a.lastLine : a.status === 'waiting' ? `대기 업무 ${a.queue}건` : a.role;
-    return `<li class="staff-item ${S.selected === id ? 'sel' : ''} ${a.off ? 'is-off' : ''}" data-id="${id}">
+    return `<li title="${esc(a.engineLabel)}" class="staff-item ${S.selected === id ? 'sel' : ''} ${a.off ? 'is-off' : ''}" data-id="${id}">
       <span class="mini">${avatar(a)}</span>
       <div class="si-main">
-        <div><b>${esc(fullName(a))}</b> <span class="pill p-${a.status}">${STATUS[a.status]}</span> <span class="eng">${esc(a.engineLabel)}</span></div>
+        <div class="si-top"><b>${esc(fullName(a))}</b> <span class="pill p-${a.status}">${STATUS[a.status]}</span></div>
         <div class="si-line">${esc(line || '')}</div>
       </div></li>`;
   }).join('');
@@ -113,8 +121,8 @@ const fileUrl = (f) => `/files/${f.split('/').map(encodeURIComponent).join('/')}
 const shortName = (f) => f.split('/').pop();
 function fileChip(f) {
   const k = kindOfName(f);
-  if (k === 'image' && !/\.heic$/i.test(f)) return `<a class="file thumb" href="${fileUrl(f)}" target="_blank" title="${esc(f)}"><img src="${fileUrl(f)}" alt="" loading="lazy"><span>${esc(shortName(f))}</span></a>`;
-  return `<a class="file" href="${fileUrl(f)}" target="_blank" title="${esc(f)}">${ICON[k] || '📄'} ${esc(shortName(f))}</a>`;
+  if (k === 'image' && !/\.heic$/i.test(f)) return `<a class="file thumb" href="${fileUrl(f)}" data-path="${esc(f)}" title="${esc(f)}"><img src="${fileUrl(f)}" alt="" loading="lazy"><span>${esc(shortName(f))}</span></a>`;
+  return `<a class="file" href="${fileUrl(f)}" data-path="${esc(f)}" title="${esc(f)}">${ICON[k] || '📄'} ${esc(shortName(f))}</a>`;
 }
 function chatItem(m) {
   if (m.from === 'system') return `<div class="msg sys">${esc(m.text)}</div>`;
@@ -156,7 +164,7 @@ function renderConsole(scroll) {
   $('#cStatus').className = `pill p-${a.status}`;
   $('#cStatus').textContent = STATUS[a.status] + (a.queue ? ` · 대기 ${a.queue}` : '');
   $('#cEngine').textContent = a.engineLabel;
-  $('#cToggle').textContent = a.off ? '출근' : '퇴근';
+  $('#cToggle').textContent = a.off ? '☀️ 출근' : '🌙 퇴근';
   $('#cStop').disabled = a.status !== 'working';
   $('#cInput').placeholder = `${a.name}에게 직접 지시 (파일은 끌어다 놓기)`;
   if (scroll) {
@@ -175,6 +183,7 @@ async function init() {
   S.chat = st.chat; S.files = st.files; S.logs = st.logs;
   S.selected = S.lead;
   if (st.mock) $('#mockBadge').classList.remove('hidden');
+  S.ffmpeg = st.ffmpeg;
   buildScene(st.background);
   renderStaff(); renderChat(); renderFiles(); renderConsole(true);
   setInterval(idleChatter, 4500);
@@ -206,6 +215,7 @@ async function init() {
   });
   es.addEventListener('chat', (ev) => { S.chat.push(JSON.parse(ev.data)); renderChat(); });
   es.addEventListener('files', (ev) => { S.files = JSON.parse(ev.data); renderFiles(); });
+  es.addEventListener('background', (ev) => { setBackground(JSON.parse(ev.data).url); });
 }
 
 // ---------- 보내기 + 이어서 하기 (지난 결과물 고르기) ----------
@@ -509,5 +519,119 @@ $('#cNickInput').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') { e.preventDefault(); saveNick(); }
   if (e.key === 'Escape') nickEditing(false);
 });
+
+// ---------- 파일 미리보기 (사무실 위에 크게, ✕ 로 닫기) ----------
+function mdToHtml(md) {
+  const blocks = [];
+  let h = esc(md).replace(/```[\w-]*\n([\s\S]*?)```/g, (_, c) => { blocks.push(`<pre><code>${c}</code></pre>`); return `\u0000${blocks.length - 1}\u0000`; });
+  h = h.replace(/^###### (.*)$/gm, '<h6>$1</h6>').replace(/^##### (.*)$/gm, '<h5>$1</h5>').replace(/^#### (.*)$/gm, '<h4>$1</h4>')
+    .replace(/^### (.*)$/gm, '<h3>$1</h3>').replace(/^## (.*)$/gm, '<h2>$1</h2>').replace(/^# (.*)$/gm, '<h1>$1</h1>')
+    .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/^\s*[-*] (.*)$/gm, '<li>$1</li>').replace(/^\s*\d+\. (.*)$/gm, '<li>$1</li>')
+    .replace(/^&gt; (.*)$/gm, '<blockquote>$1</blockquote>')
+    .replace(/\n{2,}/g, '<br><br>').replace(/\n/g, '<br>');
+  return h.replace(/\u0000(\d+)\u0000/g, (_, i) => blocks[+i]);
+}
+let PV = null;
+async function openPreview(path) {
+  PV = path;
+  const url = fileUrl(path);
+  const k = kindOfName(path);
+  $('#pvName').textContent = path;
+  $('#pvDown').href = url;
+  $('#pvDown').setAttribute('download', shortName(path));
+  $('#pvBg').classList.toggle('hidden', k !== 'image');
+  const body = $('#pvBody');
+  body.innerHTML = '<div class="empty">불러오는 중...</div>';
+  $('#preview').classList.remove('hidden');
+  if (k === 'image') body.innerHTML = `<img src="${url}" alt="">`;
+  else if (k === 'video') body.innerHTML = `<video src="${url}" controls autoplay playsinline></video>`;
+  else if (k === 'audio') body.innerHTML = `<audio src="${url}" controls autoplay></audio>`;
+  else if (/\.(html?|pdf)$/i.test(path)) body.innerHTML = `<iframe src="${url}" sandbox="allow-scripts allow-forms allow-popups"></iframe>`;
+  else if (/\.(md|txt|csv|json|srt|vtt|svg|css|js)$/i.test(path)) {
+    try {
+      const t = await (await fetch(url)).text();
+      if (PV !== path) return;
+      body.innerHTML = /\.md$/i.test(path) ? `<div class="pv-doc">${mdToHtml(t)}</div>` : `<div class="pv-doc pv-plain">${esc(t)}</div>`;
+    } catch { body.innerHTML = '<div class="empty">파일을 열지 못했어요.</div>'; }
+  } else body.innerHTML = `<div class="empty">이 파일은 미리보기를 지원하지 않아요.<br>위의 "내려받기"로 열어 주세요.</div>`;
+}
+function closePreview() {
+  PV = null;
+  $('#preview').classList.add('hidden');
+  $('#pvBody').innerHTML = ''; // 영상·음악 재생 멈춤
+}
+document.addEventListener('click', (e) => {
+  const a = e.target.closest?.('a.file[data-path]');
+  if (!a) return;
+  e.preventDefault();
+  openPreview(a.dataset.path);
+});
+$('#pvClose').addEventListener('click', closePreview);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && PV) closePreview(); });
+$('#pvBg').addEventListener('click', async () => {
+  if (!PV) return;
+  const j = await api('/api/background', { path: PV });
+  if (!j.error) { toast('사무실 배경을 바꿨어요 🏠'); closePreview(); }
+});
+
+// ---------- 사무실 배경: 디자이너에게 맡기기 / 되돌리기 ----------
+function loadImg(src) {
+  return new Promise((res) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = src; });
+}
+const svgSrc = (svg) => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+// 지금 사무실 모습(가구 + 책상 + 캐릭터)을 그림 파일로 만들어 레퍼런스로 전달
+async function sceneSnapshot() {
+  const { W, H } = SCENE;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  const room = await loadImg(S.background || svgSrc(officeRoom()));
+  if (room) g.drawImage(room, 0, 0, W, H);
+  const furn = await loadImg(svgSrc(officeFurniture()));
+  if (furn) g.drawImage(furn, 0, 0, W, H);
+  const desk = await loadImg(svgSrc(deskSVG()));
+  const items = [];
+  for (const id of S.order) {
+    const a = S.agents[id];
+    items.push({ z: a.desk.y * 10 + 40, draw: () => desk && g.drawImage(desk, (a.desk.x - 9.5) / 100 * W, a.desk.y / 100 * H - (0.19 * W * 100 / 170) / 2, 0.19 * W, 0.19 * W * 100 / 170) });
+    const src = a.image ? a.image : svgSrc(charSVG(a.character || {}));
+    const img = await loadImg(src);
+    const cw = 0.16 * W, chh = a.image ? cw : cw * 1.2;
+    items.push({ z: a.rest.y * 10, draw: () => img && g.drawImage(img, a.rest.x / 100 * W - cw / 2, a.rest.y / 100 * H - chh, cw, chh) });
+  }
+  items.sort((x, y) => x.z - y.z).forEach((it) => it.draw());
+  return new Promise((res) => c.toBlob((b) => res(b), 'image/png'));
+}
+function bgMenu(anchor) {
+  closeMenu();
+  const m = document.createElement('div');
+  m.className = 'img-menu';
+  const items = [['🖌 디자이너에게 새 배경 맡기기 (GPT)', designBackground]];
+  if (S.background) items.push(['↩ 기본 배경으로 되돌리기', async () => {
+    const r = await fetch('/api/background', { method: 'DELETE', headers: { 'X-Office': '1' } });
+    if (r.ok) toast('기본 배경으로 되돌렸어요');
+  }]);
+  for (const [label, fn] of items) {
+    const b = document.createElement('button');
+    b.textContent = label;
+    b.onclick = () => { closeMenu(); fn(); };
+    m.appendChild(b);
+  }
+  const r = anchor.getBoundingClientRect();
+  m.style.left = Math.max(8, r.right - 290) + 'px';
+  m.style.top = (r.bottom + 6) + 'px';
+  document.body.appendChild(m);
+}
+$('#bgBtn').addEventListener('click', (e) => { e.stopPropagation(); bgMenu(e.currentTarget); });
+async function designBackground() {
+  if (!confirm('디자이너에게 사무실 배경 디자인을 맡길까요?\n지금 사무실 모습과 캐릭터 이미지를 레퍼런스로 같이 보냅니다.')) return;
+  toast('지금 사무실 모습을 레퍼런스로 만드는 중...');
+  const blob = await sceneSnapshot();
+  const j = blob ? await uploadOne(new File([blob], 'office-current-layout.png', { type: 'image/png' }), () => {}) : { error: '레퍼런스 이미지를 만들지 못했어요' };
+  if (j.error) return toast(j.error);
+  const r = await api('/api/background/design', { snapshot: j.path });
+  if (!r.error) toast('디자이너에게 맡겼어요 🎨 완성되면 채팅에 이미지가 올라와요');
+}
 
 init();

@@ -626,7 +626,7 @@ async function handle(req, res) {
     return;
   }
   if (p === '/api/state') {
-    const bg = ['png', 'jpg', 'jpeg', 'webp'].map((e) => `office-bg.${e}`).find((f) => fs.existsSync(path.join(PUBLIC, f))) || null;
+    const bg = backgroundUrl();
     return json(res, {
       lead: LEAD, mock: MOCK, background: bg, ffmpeg: HAS_FFMPEG,
       agents: order.map(snapshot),
@@ -683,6 +683,46 @@ async function handle(req, res) {
     saveMeta();
     emit('files', filesWithMeta());
     return json(res, { ok: true, path: rel, kind: kindOf(rel), analyzed: !!(analysis && analysis.length), ffmpeg: HAS_FFMPEG });
+  }
+  // 사무실 배경 바꾸기: 결과물/올린 이미지 → 배경, DELETE → 기본 배경
+  if (p === '/api/background' && (req.method === 'POST' || req.method === 'DELETE')) {
+    if (req.method === 'POST') {
+      const body = await readBody(req);
+      const rel = String(body.path || '');
+      const abs = safeJoin(SHARED, encodeURIComponent(rel));
+      const ext = path.extname(rel).slice(1).toLowerCase();
+      if (!abs || !fs.existsSync(abs) || !BG_EXT.includes(ext)) return json(res, { error: 'png, jpg, webp 이미지만 배경으로 쓸 수 있어요' }, 400);
+      clearBackground();
+      fs.copyFileSync(abs, path.join(PUBLIC, `office-bg.${ext}`));
+      addChat({ from: 'system', text: `사무실 배경을 바꿨어요 🏠 (${rel})` });
+    } else clearBackground();
+    emit('background', { url: backgroundUrl() });
+    return json(res, { ok: true });
+  }
+  // 디자이너에게 배경 디자인 맡기기 (지금 화면 + 캐릭터 이미지를 레퍼런스로 첨부)
+  if (p === '/api/background/design' && req.method === 'POST') {
+    const body = await readBody(req);
+    const designer = order.find((id) => id === 'designer') || order.find((id) => /디자인/.test(agents[id].cfg.name));
+    if (!designer) return json(res, { error: '디자이너 직원이 없어요' }, 400);
+    const atts = [];
+    const snap = String(body.snapshot || '');
+    if (snap && fs.existsSync(path.join(SHARED, snap))) atts.push(snap);
+    const refDir = path.join(SHARED, 'uploads', 'refs');
+    fs.mkdirSync(refDir, { recursive: true });
+    for (const id of order) {
+      const img = imageFor(id, '');
+      if (!img) continue;
+      const src = path.join(PUBLIC, img.split('?')[0]);
+      const rel = `uploads/refs/character-${id}${path.extname(src)}`;
+      fs.copyFileSync(src, path.join(SHARED, rel));
+      filesMeta[rel] = { by: 'me', jobId: 'refs', request: '캐릭터 레퍼런스', time: Date.now() };
+      atts.push(rel);
+    }
+    saveMeta();
+    const text = backgroundBrief();
+    addChat({ from: 'me', to: designer, text: '🎨 사무실 배경 새로 디자인해줘 (지금 화면 + 캐릭터 이미지 레퍼런스 첨부)', files: atts });
+    createJob(designer, text, atts);
+    return json(res, { ok: true });
   }
   // 캐릭터 이미지 바꾸기 (화면에 끌어다 놓기)
   const im = p.match(/^\/api\/agent\/([a-z0-9_-]+)\/image$/);
@@ -796,6 +836,38 @@ function openBrowser() {
     if (process.platform === 'darwin') spawn('open', [url]);
     else if (IS_WIN) spawn('cmd', ['/c', 'start', '', url], { windowsHide: true });
   } catch {}
+}
+
+// ---------- 사무실 배경 ----------
+const BG_EXT = ['png', 'jpg', 'jpeg', 'webp'];
+function backgroundUrl() {
+  const f = BG_EXT.map((e) => `office-bg.${e}`).find((x) => fs.existsSync(path.join(PUBLIC, x)));
+  return f ? `${f}?v=${Math.round(fs.statSync(path.join(PUBLIC, f)).mtimeMs)}` : null;
+}
+function clearBackground() { for (const e of BG_EXT) fs.rmSync(path.join(PUBLIC, `office-bg.${e}`), { force: true }); }
+
+function backgroundBrief() {
+  return `사무실 대시보드의 **방 배경 그림**을 새로 디자인해 주세요.
+
+## 사용처 (중요)
+- 이 그림은 웹 화면 "AI 오피스"의 사무실 배경으로 깔립니다. 그 위에 코드로 **캐릭터, 책상 6개, 소파, 러그, 커피바, 빈백, 스탠드**가 올라갑니다.
+- 그래서 배경에는 **가구와 캐릭터를 그리지 마세요.** 벽, 바닥, 창문, 벽 장식(가랜드, 액자, 선반, 시계 등), 바닥 질감, 모서리 소품 정도만 그립니다.
+- 글자는 넣지 마세요.
+
+## 크기와 배치
+- 가로형 **3:2 비율** (1536x1024 권장). 꽉 채워서, 여백 없이.
+- 위쪽 약 17% = 벽, 나머지 = 바닥. 정면에서 살짝 위에서 내려다본 평면 시점(플랫 일러스트). 원근감은 약하게.
+- 왼쪽 1/3 = 라운지(소파·러그 자리), 오른쪽 2/3 = 책상 6개(3열 x 2줄) 자리. 이 영역은 **바닥만 깨끗하게** 비워 두세요.
+- 첨부한 office-current-layout.png 가 지금 화면입니다. 배치는 이걸 기준으로 하고, 방 분위기만 훨씬 예쁘게 바꿔 주세요.
+
+## 스타일
+- 첨부한 캐릭터 이미지들과 잘 어울리게: 부드러운 파스텔(핑크·크림·민트·하늘), 둥글고 굵은 갈색 외곽선, 귀여운 손그림 그림책 느낌, 그림자는 아주 약하게.
+- 캐릭터 이미지는 **분위기 참고용**입니다. 캐릭터 자체를 그리지 마세요.
+- 이미지 프롬프트 예시(영어): "flat cute pastel illustration of an empty cozy office room interior, front view slightly from above, pink wall with string lights and big windows on the top 17 percent, light wooden floor, no furniture, no people, no text, soft brown rounded outlines, storybook kawaii style, 3:2 landscape"
+
+## 결과물
+- 시안 2개: output/office-bg-a.png, output/office-bg-b.png
+- 각 시안 의도를 한 줄씩 보고해 주세요. 대표님이 미리보기에서 "사무실 배경으로 쓰기"를 눌러 바로 적용합니다.`;
 }
 
 // 예상 못 한 오류가 나도 사무실 전체가 꺼지지 않게

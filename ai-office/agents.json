@@ -40,8 +40,8 @@
       "role": "대표님 지시를 받아 업무를 나누고, 결과를 모아 보고",
       "prop": "📋",
       "character": { "type": "bunny", "color": "#ffffff", "accent": "#ffb3c7" },
-      "desk": { "x": 46, "y": 42 },
-      "rest": { "x": 11, "y": 47 },
+      "desk": { "x": 47.5, "y": 50 },
+      "rest": { "x": 18.3, "y": 34 },
       "allowTools": [],
       "extraArgs": []
     },
@@ -53,8 +53,8 @@
       "role": "기획서, 콘텐츠 구성안, 일정표 작성",
       "prop": "🗂️",
       "character": { "type": "bear", "color": "#f3dcc0", "accent": "#ff9fb2" },
-      "desk": { "x": 63, "y": 42 },
-      "rest": { "x": 17.5, "y": 47 },
+      "desk": { "x": 68.5, "y": 50 },
+      "rest": { "x": 9, "y": 60 },
       "allowTools": [],
       "extraArgs": []
     },
@@ -66,8 +66,8 @@
       "role": "트렌드, 경쟁 채널, 자료 조사 (출처 포함)",
       "prop": "🔍",
       "character": { "type": "dog", "color": "#fff7ec", "accent": "#ffb08a" },
-      "desk": { "x": 80, "y": 42 },
-      "rest": { "x": 24, "y": 47 },
+      "desk": { "x": 89.5, "y": 50 },
+      "rest": { "x": 18, "y": 60 },
       "allowTools": [],
       "extraArgs": []
     },
@@ -79,8 +79,8 @@
       "role": "웹페이지, 자동화 스크립트, 도구 개발",
       "prop": "💻",
       "character": { "type": "cat", "color": "#ffffff", "accent": "#ffb3c7" },
-      "desk": { "x": 46, "y": 74 },
-      "rest": { "x": 8, "y": 80 },
+      "desk": { "x": 47.5, "y": 86 },
+      "rest": { "x": 27, "y": 60 },
       "allowTools": [],
       "extraArgs": []
     },
@@ -92,8 +92,8 @@
       "role": "썸네일, 이미지, 화면 디자인 (GPT 이미지 생성 사용)",
       "prop": "🎨",
       "character": { "type": "hamster", "color": "#fffaf3", "accent": "#e8b27a" },
-      "desk": { "x": 63, "y": 74 },
-      "rest": { "x": 27, "y": 80 },
+      "desk": { "x": 68.5, "y": 86 },
+      "rest": { "x": 8, "y": 95 },
       "allowTools": [],
       "extraArgs": []
     },
@@ -105,8 +105,8 @@
       "role": "후킹 문구, SNS 게시글, 홍보 카피 여러 버전",
       "prop": "📣",
       "character": { "type": "chick", "color": "#fff1a8", "accent": "#ffb3a0" },
-      "desk": { "x": 80, "y": 74 },
-      "rest": { "x": 41, "y": 27 },
+      "desk": { "x": 89.5, "y": 86 },
+      "rest": { "x": 28, "y": 95 },
       "allowTools": [],
       "extraArgs": []
     }

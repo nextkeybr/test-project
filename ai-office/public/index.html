@@ -9,15 +9,27 @@
 <body>
 <div class="app">
   <aside class="side">
-    <section class="card staff">
-      <header class="card-h">
-        <b>직원</b><span class="muted" id="attend">출근 0 / 0</span>
+    <section class="card console">
+      <header class="console-h">
+        <span id="cAvatar" class="mini"></span>
+        <b id="cName">직원을 선택하세요</b>
+        <span id="cNickEdit" class="nick-edit hidden"><span id="cJob"></span><input id="cNickInput" maxlength="12" placeholder="이름"><button type="button" class="btn sm dark" id="cNickSave">저장</button><button type="button" class="btn sm" id="cNickCancel">취소</button></span>
+        <button type="button" class="btn sm" id="cNickBtn" title="이 직원의 이름 바꾸기">✏️</button>
+        <span id="cStatus" class="pill"></span>
+        <span id="cEngine" class="eng"></span>
         <span class="grow"></span>
-        <button class="btn sm upd hidden" id="updBtn"></button>
-        <button class="btn sm" id="allOn">전체 출근</button>
-        <button class="btn sm" id="allOff">전체 퇴근</button>
+        <span class="live"><i></i>LIVE</span>
+        <button class="btn sm" id="cImg" title="캐릭터 이미지 바꾸기 (이미지를 캐릭터에 끌어다 놓아도 됩니다)">🖼</button>
+        <button class="btn sm" id="cStop" title="지금 하던 일 멈추기">⏹ 중지</button>
+        <button class="btn sm" id="cToggle">퇴근</button>
       </header>
-      <ul id="staffList" class="staff-list"></ul>
+      <pre id="cLog" class="term"></pre>
+      <div id="cAtt" class="att-chips hidden"></div>
+      <form id="cForm" class="console-form">
+        <button type="button" class="btn clip" data-for="c" title="자료 첨부">📎</button>
+        <input id="cInput" autocomplete="off" placeholder="이 직원에게 직접 지시 (파일은 끌어다 놓기)">
+        <button class="btn dark">보내기</button>
+      </form>
     </section>
     <section class="card chat">
       <header class="card-h tabs">
@@ -28,7 +40,7 @@
       <div id="fileList" class="file-list hidden"></div>
       <div id="chatAtt" class="att-chips hidden"></div>
       <form id="chatForm" class="chat-form">
-        <button type="button" class="btn clip" data-for="chat" title="이어서 할 자료 고르기">📎</button>
+        <button type="button" class="btn clip" data-for="chat" title="자료 첨부">📎</button>
         <input id="chatInput" autocomplete="off" placeholder="비서에게 지시 (파일은 끌어다 놓기)">
         <button class="btn dark">보내기</button>
       </form>
@@ -39,32 +51,32 @@
     <div class="scene-wrap">
       <div id="scene" class="scene">
         <div id="bg" class="bg"></div>
+        <div id="furniture" class="bg furniture"></div>
         <div id="layer" class="layer"></div>
-        <div id="mockBadge" class="mock-badge hidden">연습 모드 — 실제 AI 대신 가짜 직원이 일하는 중</div>
+        <div id="mockBadge" class="mock-badge hidden">연습 모드</div>
+        <button type="button" class="btn sm bg-btn" id="bgBtn" title="사무실 배경 바꾸기">🎨 배경</button>
+      </div>
+      <div id="preview" class="preview hidden">
+        <div class="pv-bar">
+          <b id="pvName"></b>
+          <span class="grow"></span>
+          <button type="button" class="btn sm" id="pvBg">🏠 사무실 배경으로 쓰기</button>
+          <a class="btn sm" id="pvDown" download>⬇ 내려받기</a>
+          <button type="button" class="btn sm dark pv-x" id="pvClose" title="닫기">✕</button>
+        </div>
+        <div id="pvBody" class="pv-body"></div>
       </div>
     </div>
 
-    <section class="card console">
-      <header class="console-h">
-        <span id="cAvatar" class="mini"></span>
-        <b id="cName">직원을 선택하세요</b>
-        <span id="cNickEdit" class="nick-edit hidden"><span id="cJob"></span><input id="cNickInput" maxlength="12" placeholder="이름"><button type="button" class="btn sm dark" id="cNickSave">저장</button><button type="button" class="btn sm" id="cNickCancel">취소</button></span>
-        <button type="button" class="btn sm" id="cNickBtn" title="이 직원의 이름 바꾸기">✏️ 이름</button>
-        <span id="cStatus" class="pill"></span>
-        <span id="cEngine" class="muted small"></span>
+    <section class="card staff">
+      <header class="card-h">
+        <b>직원</b><span class="muted" id="attend">출근 0 / 0</span>
         <span class="grow"></span>
-        <span class="live"><i></i>LIVE</span>
-        <button class="btn sm" id="cImg" title="이미지 파일을 캐릭터나 직원 목록에 끌어다 놓아도 됩니다">🖼 캐릭터 바꾸기</button>
-        <button class="btn sm" id="cStop">작업 중지</button>
-        <button class="btn sm" id="cToggle">퇴근</button>
+        <button class="btn sm upd hidden" id="updBtn"></button>
+        <button class="btn sm" id="allOn">전체 출근</button>
+        <button class="btn sm" id="allOff">전체 퇴근</button>
       </header>
-      <pre id="cLog" class="term"></pre>
-      <div id="cAtt" class="att-chips hidden"></div>
-      <form id="cForm" class="console-form">
-        <button type="button" class="btn clip" data-for="c" title="이어서 할 자료 고르기">📎</button>
-        <input id="cInput" autocomplete="off" placeholder="이 직원에게 직접 지시 (파일은 끌어다 놓기)">
-        <button class="btn dark">보내기</button>
-      </form>
+      <ul id="staffList" class="staff-list"></ul>
     </section>
   </main>
 </div>
