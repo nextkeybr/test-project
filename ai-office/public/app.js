@@ -143,6 +143,17 @@ function fileChip(f) {
   if (k === 'image' && !/\.heic$/i.test(f)) return `<a class="file thumb" href="${fileUrl(f)}" data-path="${esc(f)}" title="${esc(f)}"><img src="${fileUrl(f)}" alt="" loading="lazy"><span>${esc(shortName(f))}</span></a>`;
   return `<a class="file" href="${fileUrl(f)}" data-path="${esc(f)}" title="${esc(f)}">${ICON[k] || '📄'} ${esc(shortName(f))}</a>`;
 }
+function helpCard(h) {
+  const btn = h.action === 'setup' ? '<button type="button" class="btn sm dark" data-act="setup">🩺 시작 준비 열기</button>'
+    : h.action === 'manager' ? '<button type="button" class="btn sm dark" data-act="manager">⚙️ 직원 관리 열기</button>' : '';
+  return `<div class="help-card"><b>💡 ${esc(h.title)}</b>${esc(h.fix)}${btn ? '<br>' + btn : ''}</div>`;
+}
+document.addEventListener('click', (e) => {
+  const b = e.target.closest?.('[data-act]');
+  if (!b) return;
+  if (b.dataset.act === 'setup') openSetup();
+  if (b.dataset.act === 'manager') openManager();
+});
 function chatItem(m) {
   if (m.from === 'system') return `<div class="msg sys">${esc(m.text)}</div>`;
   const me = m.from === 'me';
@@ -151,7 +162,7 @@ function chatItem(m) {
   const av = me ? '<span class="mini me">나</span>' : `<span class="mini">${a ? avatar(a) : ''}</span>`;
   return `<div class="msg ${me ? 'mine' : ''} ${m.ok === false ? 'fail' : ''}">
     ${av}<div class="m-body"><div class="m-h"><b>${who}</b> <span class="muted">${time(m.time)}</span></div>
-    <div class="m-text">${esc(m.text)}</div>${(m.files || []).map(fileChip).join('')}</div></div>`;
+    <div class="m-text">${esc(m.text)}</div>${(m.files || []).map(fileChip).join('')}${m.help ? helpCard(m.help) : ''}</div></div>`;
 }
 function renderChat() {
   const box = $('#chatList');
@@ -210,6 +221,10 @@ async function init() {
   setInterval(idleChatter, 4500);
 
   checkVersion();
+  // 처음이거나 로그인이 풀린 AI가 있으면 시작 준비 창을 자동으로 띄움
+  if (!st.mock) fetch('/api/setup').then((r) => r.json()).then((su) => {
+    if (su.engines.some((e) => e.needed && (!e.installed || e.loggedIn === false))) openSetup(su);
+  }).catch(() => {});
   const es = new EventSource('/api/events');
   // 서버가 다시 켜지면(업데이트 등) 화면을 자동으로 새로고침
   let lost = false;
@@ -238,6 +253,20 @@ async function init() {
   es.addEventListener('chat', (ev) => { S.chat.push(JSON.parse(ev.data)); renderChat(); });
   es.addEventListener('files', (ev) => { S.files = JSON.parse(ev.data); renderFiles(); });
   es.addEventListener('roster', () => location.reload());
+  es.addEventListener('setup-log', (ev) => {
+    const pre = $('#suLog');
+    pre.textContent += (pre.textContent ? '\n' : '') + JSON.parse(ev.data).line;
+    pre.scrollTop = pre.scrollHeight;
+  });
+  es.addEventListener('setup-url', (ev) => {
+    const { url } = JSON.parse(ev.data);
+    try { if (/^(localhost|127\.0\.0\.1)$/.test(new URL(url).hostname)) return; } catch { return; }
+    if ($('#suUrls').querySelector('a')) return; // 첫 로그인 주소 하나만
+    const a = document.createElement('a');
+    a.href = url; a.target = '_blank'; a.rel = 'noopener';
+    a.textContent = '👉 로그인 페이지가 안 열렸다면 여기를 누르세요';
+    $('#suUrls').appendChild(a);
+  });
   es.addEventListener('background', (ev) => { setBackground(JSON.parse(ev.data).url); });
 }
 
@@ -703,6 +732,68 @@ $('#mgForm').addEventListener('submit', async (e) => {
   const body = Object.fromEntries(f.entries());
   const j = await api('/api/agents', body);
   if (!j.error) { toast('새 직원을 뽑았어요 🎉'); e.target.reset(); }
+});
+
+// ---------- 시작 준비 (설치·로그인) ----------
+function suRow(ic, title, desc, ok, btns) {
+  return `<div class="su-row ${ok ? 'ok' : 'todo'}"><span class="su-ic">${ic}</span><div class="su-main"><b>${title}</b><small>${desc}</small></div>${btns || ''}</div>`;
+}
+function renderSetup(su) {
+  const rows = [];
+  rows.push(suRow('✅', 'AI 오피스', '설치 완료', true));
+  if (su.platform === 'win32' && !su.git) rows.push(suRow('🧰', 'Git (윈도우용 Claude Code에 필요할 수 있음)', 'Claude Code가 "Git이 필요하다"고 하면 설치하세요.', false, `<button class="btn sm" data-su="install:git">Git 설치하기</button>`));
+  for (const e of su.engines) {
+    const users = S.order.filter((id) => S.agents[id].engine === e.key).map((id) => S.agents[id].name).join(', ');
+    const desc = users ? `쓰는 직원: ${esc(users)}` : e.needed ? '다른 AI가 멈추면 대신 일해요' : '지금 쓰는 직원 없음 (선택)';
+    if (!e.installed) rows.push(suRow('⬇️', `${esc(e.label)} — 설치 필요`, desc, false, `<button class="btn sm dark" data-su="install:${e.key}">설치하기</button>`));
+    else if (e.loggedIn === false) rows.push(suRow('🔑', `${esc(e.label)} — 로그인 필요`, desc + (e.key === 'claude' ? ' · Claude 유료 구독 계정으로 로그인' : e.key === 'codex' ? ' · ChatGPT 계정으로 로그인' : ''), false, `<button class="btn sm dark" data-su="login:${e.key}">로그인하기</button>`));
+    else rows.push(suRow('✅', `${esc(e.label)}`, desc + ' · 준비 완료', true, `<button class="btn sm" data-su="install:${e.key}" title="최신 버전으로 다시 설치">업데이트</button>`));
+  }
+  rows.push(su.ffmpeg
+    ? suRow('✅', 'ffmpeg (선택)', '영상 장면 분석 준비 완료', true)
+    : suRow('🎬', 'ffmpeg (선택)', '영상을 올렸을 때 장면을 분석하려면 필요해요. 없어도 사무실은 쓸 수 있어요.', false, `<button class="btn sm" data-su="install:ffmpeg">설치하기</button>`));
+  $('#suList').innerHTML = rows.join('');
+  const need = su.engines.filter((e) => e.needed && (!e.installed || e.loggedIn === false));
+  $('#suSummary').innerHTML = need.length ? `<span style="color:#d6336c">남은 준비 ${need.length}개</span>` : '<span style="color:#2a9a63">모든 준비가 끝났어요 🎉</span>';
+  document.querySelectorAll('[data-su]').forEach((b) => b.addEventListener('click', () => {
+    const [kind, what] = b.dataset.su.split(':');
+    runSetup(kind, what, b.closest('.su-row').querySelector('b').textContent);
+  }));
+}
+async function openSetup(su) {
+  $('#setup').classList.remove('hidden');
+  if (!su) { $('#suList').innerHTML = '<div class="empty">확인하는 중...</div>'; su = await (await fetch('/api/setup')).json(); }
+  renderSetup(su);
+}
+async function runSetup(kind, what, title) {
+  $('#suLogin').classList.remove('hidden');
+  $('#suLoginTitle').textContent = kind === 'login' ? `${title}: 브라우저에서 로그인을 마쳐 주세요` : `${title}: 설치 중... (몇 분 걸릴 수 있어요)`;
+  $('#suInputForm').classList.toggle('hidden', kind !== 'login');
+  $('#suUrls').innerHTML = '';
+  $('#suLog').textContent = '';
+  document.querySelectorAll('[data-su]').forEach((b) => { b.disabled = true; });
+  const r = await fetch(`/api/setup/${kind}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Office': '1' }, body: JSON.stringify({ what }) });
+  const j = await r.json().catch(() => ({ error: '응답을 읽지 못했어요' }));
+  if (j.error) {
+    $('#suLoginTitle').textContent = '⚠️ ' + j.error;
+    if (j.help) $('#suUrls').innerHTML = helpCard(j.help);
+  } else {
+    $('#suLoginTitle').textContent = '✅ 완료!';
+    setTimeout(() => $('#suLogin').classList.add('hidden'), 1500);
+  }
+  openSetup();
+}
+$('#setupBtn').addEventListener('click', () => openSetup());
+$('#suRefresh').addEventListener('click', () => openSetup());
+$('#suClose').addEventListener('click', () => $('#setup').classList.add('hidden'));
+$('#suDone').addEventListener('click', () => $('#setup').classList.add('hidden'));
+$('#suCancel').addEventListener('click', () => fetch('/api/setup/cancel', { method: 'POST', headers: { 'X-Office': '1' } }));
+$('#suInputForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const v = $('#suInput').value.trim();
+  if (!v) return;
+  $('#suInput').value = '';
+  api('/api/setup/input', { text: v });
 });
 
 init();

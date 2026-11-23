@@ -16,53 +16,38 @@ AI 직원 6명이 귀여운 사무실에서 실제로 일하는 개인용 대시
 
 ---
 
-## 1. 처음 한 번만 준비하기
+## 1. 설치하기 — 명령 한 줄이면 끝
 
-1. **Node.js 설치**: https://nodejs.org 에서 LTS 버전을 받아 설치합니다.
-2. **AI 프로그램 설치·로그인**: 터미널에 한 줄씩 입력합니다.
+Node.js, Claude Code, Codex가 없으면 **알아서 설치**합니다. 관리자 비밀번호는 필요 없어요.
 
-```bash
-curl -fsSL https://claude.ai/install.sh | bash
+### 윈도우
+1. 키보드에서 **윈도우키 + R** 을 누릅니다 (실행 창이 뜹니다).
+2. 아래 한 줄을 붙여넣고 **Enter**:
+
+```
+powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/nextkeybr/test-project/claude/ecstatic-lovelace-echyjs/ai-office/install-win.ps1 | iex"
 ```
 
-```bash
-npm install -g @openai/codex
-```
-
-3. 터미널을 껐다 켠 뒤 `claude` 와 `codex` 를 한 번씩 실행해서 로그인합니다.
-
-> Claude는 Pro/Max 구독, Codex는 ChatGPT 유료 구독으로 쓸 수 있습니다.
-
-## 2. 설치하기 (맥) — 한 줄이면 끝
-
-터미널에 아래 한 줄을 붙여넣고 Enter:
+### 맥
+1. **Command + 스페이스** → `터미널` 입력 → Enter.
+2. 아래 한 줄을 붙여넣고 **Enter**:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/nextkeybr/test-project/claude/ecstatic-lovelace-echyjs/ai-office/install-mac.sh | bash
 ```
 
-- 내 컴퓨터의 `AI-Office` 폴더(홈 폴더 안)에 설치되고, **바탕화면에 `AI오피스` 아이콘**이 생깁니다.
-- 앞으로는 **바탕화면 아이콘 더블클릭**으로 켜면 됩니다. 브라우저가 자동으로 열립니다.
-- 끌 때는 뜬 터미널 창을 닫거나 Ctrl + C.
+### 설치가 끝나면
+- 사무실이 자동으로 열리고 **🩺 시작 준비** 창이 뜹니다. **[로그인하기]** 버튼을 눌러 Claude(유료 구독 계정)와 ChatGPT 계정으로 로그인하면 끝입니다.
+- 다음부터는 **바탕화면의 `AI오피스` 아이콘**을 더블클릭하세요.
+- 새 버전이 나오면 화면 위쪽에 **✨ 새 버전 업데이트** 버튼이 생깁니다.
 
-### 업데이트
-새 버전이 나오면 사무실 화면 왼쪽 위에 **✨ 새 버전 업데이트** 버튼이 나타납니다. 누르면 자동으로 받고 다시 열립니다.
-채팅 기록, 결과물, 캐릭터 이미지, 내 설정은 그대로 남습니다.
+### 문제가 생기면
+- 설치 중 오류: 화면에 **원인과 해결 방법**이 한글로 나옵니다. 그래도 안 되면 `AI-Office/install-log.txt` 파일을 보내주세요.
+- 사무실에서 직원이 오류로 멈추면: 채팅에 **💡 해결 방법 카드**와 버튼(시작 준비 / 직원 관리)이 같이 나옵니다.
+- 설치·로그인 상태는 언제든 **🩺 시작 준비** 버튼에서 확인하고, 버튼으로 다시 설치·로그인·업데이트할 수 있습니다.
 
 ### AI 없이 먼저 구경하기 (연습 모드)
-`AI-Office` 폴더에서 `npm run demo`. 가짜 직원들이 일하는 흐름을 보여줍니다. 비용이 들지 않습니다.
-
-## 2-1. 설치하기 (윈도우) — 한 줄이면 끝
-
-1. 먼저 준비: Node.js(https://nodejs.org), 그리고 PowerShell 에서 Claude Code 설치 `irm https://claude.ai/install.ps1 | iex` 와 `npm install -g @openai/codex` 후 각각 로그인.
-2. 시작 버튼 → `powershell` 입력 → **Windows PowerShell** 을 열고 아래 한 줄을 붙여넣고 Enter:
-
-```powershell
-irm https://raw.githubusercontent.com/nextkeybr/test-project/claude/ecstatic-lovelace-echyjs/ai-office/install-win.ps1 | iex
-```
-
-- 내 사용자 폴더 안 `AI-Office` 에 설치되고, **바탕화면에 `AI오피스` 아이콘**이 생깁니다.
-- 앞으로는 아이콘 더블클릭으로 켜고, 업데이트는 화면의 **✨ 새 버전 업데이트** 버튼으로 합니다.
+`AI-Office` 폴더에서 `npm run demo`. 가짜 직원들이 일하는 흐름을 보여줍니다.
 
 ## 3. 사용 방법
 

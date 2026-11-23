@@ -73,6 +73,7 @@
         <b>직원</b><span class="muted" id="attend">출근 0 / 0</span>
         <span class="grow"></span>
         <button class="btn sm upd hidden" id="updBtn"></button>
+        <button class="btn sm" id="setupBtn" title="설치·로그인 상태 점검">🩺 시작 준비</button>
         <button class="btn sm" id="mgBtn">⚙️ 직원 관리</button>
         <button class="btn sm" id="allOn">전체 출근</button>
         <button class="btn sm" id="allOff">전체 퇴근</button>
@@ -114,6 +115,20 @@
       </div>
       <div class="mg-f"><span class="muted small">캐릭터 이미지는 뽑은 뒤 캐릭터에 끌어다 놓아 바꿀 수 있어요.</span><span class="grow"></span><button class="btn dark">뽑기</button></div>
     </form>
+  </div>
+</div>
+<div id="setup" class="modal hidden">
+  <div class="modal-box su-box">
+    <div class="modal-h"><b>🩺 시작 준비</b><span class="grow"></span><button type="button" class="btn sm" id="suRefresh">다시 확인</button><button type="button" class="btn sm" id="suClose">닫기</button></div>
+    <p class="muted small pk-note">AI 직원이 일하려면 아래 항목이 준비돼야 해요. 버튼만 누르면 됩니다. 터미널은 쓰지 않아도 돼요.</p>
+    <div id="suList" class="su-list"><div class="empty">확인하는 중...</div></div>
+    <div id="suLogin" class="su-login hidden">
+      <div class="su-login-h"><b id="suLoginTitle">진행 중</b><span class="grow"></span><button type="button" class="btn sm" id="suCancel">취소</button></div>
+      <div id="suUrls" class="su-urls"></div>
+      <pre id="suLog" class="term su-log"></pre>
+      <form id="suInputForm" class="su-input"><input id="suInput" autocomplete="off" placeholder="화면에서 코드를 붙여넣으라고 하면 여기에 붙여넣고 Enter"><button class="btn sm dark">보내기</button></form>
+    </div>
+    <div class="modal-f"><span id="suSummary" class="small"></span><span class="grow"></span><button type="button" class="btn dark" id="suDone">사무실 시작하기</button></div>
   </div>
 </div>
 <script src="characters.js"></script>

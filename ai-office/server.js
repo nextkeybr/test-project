@@ -32,6 +32,32 @@ const SHARED = path.join(ROOT, 'shared');
 const DATA = path.join(ROOT, 'data');
 const PUBLIC = path.join(ROOT, 'public');
 const LEAD = SET.leadAgent;
+const os = require('os');
+// 설치 프로그램이 넣어둔 Node·Codex, Claude Code 기본 설치 위치를 찾을 수 있게 PATH 앞에 추가
+const RUNTIME = path.join(ROOT, 'runtime');
+const NPM_PREFIX = path.join(RUNTIME, 'npm');
+const extraPath = IS_WIN
+  ? [path.join(RUNTIME, 'node'), NPM_PREFIX, path.join(os.homedir(), '.local', 'bin')]
+  : [path.join(RUNTIME, 'node', 'bin'), path.join(NPM_PREFIX, 'bin'), path.join(os.homedir(), '.local', 'bin'), '/opt/homebrew/bin', '/usr/local/bin'];
+process.env.PATH = [...extraPath, process.env.PATH].join(path.delimiter);
+
+// ---------- 오류를 쉬운 말로 바꾸기 ----------
+function explainError(text) {
+  const t = String(text || '');
+  const rules = [
+    [/ENOENT|is not recognized|not recognized as|command not found|찾을 수 없습니다|No such file or directory.*(claude|codex)/i, '프로그램이 설치되어 있지 않아요', '🩺 시작 준비 창에서 [설치하기]를 눌러 주세요.', 'setup'],
+    [/not logged in|log ?in required|please (log|sign) ?in|unauthori[sz]ed|\b401\b|invalid.*(token|credential)|auth(entication)? (failed|error)|expired.*token|token.*expired|run .*login/i, 'AI 로그인이 풀렸어요', '🩺 시작 준비 창에서 [로그인하기]를 눌러 다시 로그인해 주세요.', 'setup'],
+    [/rate.?limit|usage limit|quota|\b429\b|too many requests|limit reached|exceeded your|weekly limit|5-hour limit/i, 'AI 사용량 한도에 걸렸어요', '잠시 뒤에 다시 시키거나, ⚙️ 직원 관리에서 이 직원의 AI를 다른 것으로 바꿔 주세요.', 'manager'],
+    [/ENOTFOUND|ECONNRESET|ECONNREFUSED|ETIMEDOUT|getaddrinfo|network error|fetch failed|socket hang up|offline/i, '인터넷 연결에 문제가 있어요', '와이파이·인터넷 연결을 확인하고 다시 시켜 주세요.', null],
+    [/git bash|requires git|git for windows|git-bash/i, 'Git 프로그램이 필요해요 (윈도우)', '🩺 시작 준비 창에서 [Git 설치하기]를 눌러 주세요.', 'setup'],
+    [/EACCES|EPERM|permission denied|access is denied|권한/i, '권한 문제로 막혔어요', '사무실을 껐다가 다시 켜 보세요. 계속되면 AI-Office 폴더를 다른 프로그램이 쓰고 있지 않은지 확인해 주세요.', null],
+    [/ENOSPC|no space left|disk full/i, '저장 공간이 부족해요', '필요 없는 파일을 지워 저장 공간을 확보해 주세요.', null],
+    [/unexpected argument|unknown option|unrecognized option|invalid value for/i, 'AI 프로그램 버전이 맞지 않아요', '🩺 시작 준비 창에서 그 AI를 [업데이트]해 주세요. 그래도 안 되면 사무실 업데이트를 확인해 주세요.', 'setup'],
+    [/timed? ?out|시간 초과/i, '작업이 너무 오래 걸려 멈췄어요', '일을 더 작게 나눠서 다시 시켜 보세요.', null],
+  ];
+  for (const [re, title, fix, action] of rules) if (re.test(t)) return { title, fix, action };
+  return null;
+}
 
 for (const d of [SHARED, DATA]) fs.mkdirSync(d, { recursive: true });
 
@@ -536,7 +562,7 @@ function finishTask(a, task, outBefore, ok, text) {
   } catch {}
 
   log(id, ok ? `✅ 업무 완료 (${Math.round((Date.now() - task.startedAt) / 1000)}초)` : '⚠️ 업무 실패/중지');
-  addChat({ from: id, text: shown.slice(0, 6000), files, ok, jobId: job.id });
+  addChat({ from: id, text: shown.slice(0, 6000), files, ok, jobId: job.id, help: ok ? null : explainError(text + '\n' + a.log.slice(-30).join('\n')) });
   job.results.push({ agentId: id, text: shown, files, ok, kind: task.kind });
   if (task.kind === 'delegated') job.needsReview = true;
   for (const d of delegations) {
@@ -578,7 +604,7 @@ const MAX_UPLOAD = 2 * 1024 * 1024 * 1024; // 2GB
 const run = (cmd, args, timeout = 120000) => new Promise((resolve) => {
   execFile(cmd, args, { timeout, windowsHide: true, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => resolve({ err, stdout: String(stdout || ''), stderr: String(stderr || '') }));
 });
-let HAS_FFMPEG = false;
+let HAS_FFMPEG = false; // 시작 준비 창에서 다시 확인할 수 있음
 run('ffmpeg', ['-version'], 10000).then((r) => { HAS_FFMPEG = !r.err; if (!HAS_FFMPEG) console.log('ℹ️ ffmpeg 이 없어 영상 분석(장면 모음표)은 꺼져 있습니다. README 참고.'); });
 const fmtTime = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}.${Math.floor((t % 1) * 10)}`;
 
@@ -793,6 +819,25 @@ async function handle(req, res) {
     pushAgent(im[1]);
     return json(res, { ok: true });
   }
+  // ---------- 시작 준비 (설치·로그인 점검) ----------
+  if (p === '/api/setup' && req.method === 'GET') return json(res, await setupStatus());
+  if (p === '/api/setup/install' && req.method === 'POST') {
+    const body = await readBody(req);
+    return json(res, await runSetupTask('install', String(body.what || '')));
+  }
+  if (p === '/api/setup/login' && req.method === 'POST') {
+    const body = await readBody(req);
+    return json(res, await runSetupTask('login', String(body.what || '')));
+  }
+  if (p === '/api/setup/input' && req.method === 'POST') {
+    const body = await readBody(req);
+    if (setupProc && setupProc.stdin.writable) { setupProc.stdin.write(String(body.text || '') + '\n'); return json(res, { ok: true }); }
+    return json(res, { error: '진행 중인 로그인이 없어요' }, 400);
+  }
+  if (p === '/api/setup/cancel' && req.method === 'POST') {
+    if (setupProc) { killTree(setupProc); setupProc = null; }
+    return json(res, { ok: true });
+  }
   // 직원 추가
   if (p === '/api/agents' && req.method === 'POST') {
     const body = await readBody(req);
@@ -945,6 +990,104 @@ function openBrowser() {
     if (process.platform === 'darwin') spawn('open', [url]);
     else if (IS_WIN) spawn('cmd', ['/c', 'start', '', url], { windowsHide: true });
   } catch {}
+}
+
+// ---------- 시작 준비: 설치 여부·로그인 여부 확인, 버튼으로 설치·로그인 ----------
+const runQuiet = (cmd, args, timeout = 20000) => new Promise((resolve) => {
+  let out = '', done = false;
+  const finish = (code) => { if (!done) { done = true; resolve({ code, out }); } };
+  try {
+    const c = spawn(cmd, args, { shell: IS_WIN, windowsHide: true, env: process.env });
+    c.stdout.on('data', (d) => { out += d; });
+    c.stderr.on('data', (d) => { out += d; });
+    c.on('error', () => finish(-1));
+    c.on('close', (code) => finish(code));
+    setTimeout(() => { try { c.kill(); } catch {} finish(-2); }, timeout);
+  } catch { finish(-1); }
+});
+async function loggedIn(key) {
+  if (MOCK) return true;
+  if (key === 'claude') {
+    const r = await runQuiet('claude', ['auth', 'status', '--json']);
+    try { return !!JSON.parse(r.out.slice(r.out.indexOf('{'))).loggedIn; } catch { return r.code === 0 && !/not logged in/i.test(r.out); }
+  }
+  if (key === 'codex') { const r = await runQuiet('codex', ['login', 'status']); return r.code === 0 && !/not logged in/i.test(r.out); }
+  return null;
+}
+async function setupStatus() {
+  const used = new Set(order.map((id) => agents[id].cfg.engine));
+  const keys = Object.keys(CFG.engines).filter((k) => k !== 'gemini' || used.has('gemini'));
+  const engines = [];
+  for (const key of keys) {
+    const installed = MOCK ? true : await checkEngine(key);
+    engines.push({ key, label: CFG.engines[key].label, installed, loggedIn: installed ? await loggedIn(key) : false, needed: used.has(key) || [...used].some((u) => (SET.fallback || {})[u] === key) });
+  }
+  const ff = await runQuiet('ffmpeg', ['-version'], 10000);
+  HAS_FFMPEG = ff.code === 0;
+  const git = IS_WIN ? (await runQuiet('git', ['--version'], 10000)).code === 0 : true;
+  return { platform: process.platform, engines, ffmpeg: HAS_FFMPEG, git, busy: setupBusy };
+}
+let setupProc = null, setupBusy = null;
+function setupCommand(kind, what) {
+  if (kind === 'login') {
+    if (what === 'claude') return ['claude', ['auth', 'login', '--claudeai']];
+    if (what === 'codex') return ['codex', ['login']];
+  }
+  if (kind === 'install') {
+    if (what === 'claude') return IS_WIN
+      ? ['powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', 'irm https://claude.ai/install.ps1 | iex']]
+      : ['bash', ['-c', 'curl -fsSL https://claude.ai/install.sh | bash']];
+    if (what === 'codex') return ['npm', ['install', '-g', '--prefix', NPM_PREFIX, '@openai/codex@latest']];
+    if (what === 'ffmpeg') return IS_WIN
+      ? ['winget', ['install', '-e', '--id', 'Gyan.FFmpeg', '--accept-package-agreements', '--accept-source-agreements']]
+      : ['brew', ['install', 'ffmpeg']];
+    if (what === 'git' && IS_WIN) return ['winget', ['install', '-e', '--id', 'Git.Git', '--accept-package-agreements', '--accept-source-agreements']];
+  }
+  return null;
+}
+function runSetupTask(kind, what) {
+  return new Promise((resolve) => {
+    if (setupBusy) return resolve({ error: '다른 설치·로그인이 진행 중이에요. 끝난 뒤에 눌러 주세요' });
+    const c = setupCommand(kind, what);
+    if (!c) return resolve({ error: '알 수 없는 항목이에요' });
+    setupBusy = `${kind}:${what}`;
+    const label = { claude: 'Claude Code', codex: 'Codex (GPT)', ffmpeg: 'ffmpeg', git: 'Git' }[what] || what;
+    const say = (line) => emit('setup-log', { line: String(line).replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '') });
+    say(`▶ ${label} ${kind === 'login' ? '로그인' : '설치'} 시작`);
+    let out = '';
+    const urls = new Set();
+    let proc;
+    try {
+      proc = spawn(c[0], c[1].map((x) => (IS_WIN && /\s/.test(x) && c[0] !== 'powershell' ? `"${x}"` : x)), { shell: IS_WIN && c[0] !== 'powershell', windowsHide: true, env: { ...process.env, BROWSER: process.env.BROWSER || '' } });
+    } catch (e) { setupBusy = null; return resolve({ error: e.message, help: explainError(e.message) }); }
+    setupProc = proc;
+    const onData = (d) => {
+      const sline = d.toString();
+      out += sline;
+      sline.split(/\r?\n/).forEach((l) => { if (l.trim()) say(l); });
+      for (const u of sline.match(/https?:\/\/[^\s"'<>]+/g) || []) if (!urls.has(u)) { urls.add(u); emit('setup-url', { url: u }); }
+    };
+    proc.stdout.on('data', onData);
+    proc.stderr.on('data', onData);
+    const timer = setTimeout(() => killTree(proc), (kind === 'login' ? 10 : 20) * 60 * 1000);
+    const end = async (code, errMsg) => {
+      clearTimeout(timer);
+      setupProc = null;
+      setupBusy = null;
+      if (kind === 'install') {
+        await checkEngine(what).catch(() => {});
+        if (what === 'ffmpeg') HAS_FFMPEG = (await runQuiet('ffmpeg', ['-version'], 10000)).code === 0;
+      }
+      const ok = !errMsg && code === 0;
+      say(ok ? `✅ ${label} ${kind === 'login' ? '로그인' : '설치'} 완료` : `⚠️ ${label} ${kind === 'login' ? '로그인' : '설치'}이(가) 끝나지 않았어요`);
+      emit('setup-done', { ok });
+      let help = ok ? null : explainError((errMsg || '') + '\n' + out);
+      if (!ok && !help && what === 'ffmpeg' && !IS_WIN && /brew/.test(errMsg || out)) help = { title: 'Homebrew가 없어요', fix: '맥에서는 https://brew.sh 의 안내대로 Homebrew를 설치한 뒤 다시 눌러 주세요. ffmpeg은 선택 사항이라 없어도 사무실은 쓸 수 있어요.', action: null };
+      resolve(ok ? { ok: true } : { error: `${label} ${kind === 'login' ? '로그인' : '설치'}이(가) 끝나지 않았어요`, help });
+    };
+    proc.on('error', (e) => end(-1, e.code === 'ENOENT' ? `${c[0]} 프로그램을 찾을 수 없음 (ENOENT)` : e.message));
+    proc.on('close', (code) => end(code));
+  });
 }
 
 // ---------- 사무실 배경 ----------
