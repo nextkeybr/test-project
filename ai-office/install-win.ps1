@@ -30,7 +30,7 @@ function Invoke-AIOfficeInstall {
 
   try {
     Step '1/5' '인터넷 연결 확인'
-    try { Invoke-WebRequest -Uri 'https://codeload.github.com' -Method Head -UseBasicParsing -TimeoutSec 15 | Out-Null } catch { Fail '인터넷에 연결할 수 없어요.' '와이파이를 확인하고 다시 실행해 주세요.' }
+    try { Invoke-WebRequest -Uri $Url -Method Head -UseBasicParsing -TimeoutSec 15 | Out-Null } catch { Fail '인터넷에 연결할 수 없어요.' '와이파이를 확인하고 다시 실행해 주세요.' }
     Ok '연결됨'
 
     Step '2/5' 'AI 오피스 파일 받기'

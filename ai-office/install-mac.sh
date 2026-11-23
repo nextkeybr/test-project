@@ -28,7 +28,7 @@ step() { echo ""; echo "[$1] $2"; }
 export PATH="$DEST/runtime/node/bin:$DEST/runtime/npm/bin:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 
 step "1/5" "인터넷 연결 확인"
-curl -fsI https://codeload.github.com >/dev/null 2>&1 || fail "인터넷에 연결할 수 없어요." "와이파이를 확인하고 이 명령을 다시 실행해 주세요."
+curl -fsI --max-time 20 "$URL" >/dev/null 2>&1 || fail "인터넷에 연결할 수 없어요." "와이파이를 확인하고 이 명령을 다시 실행해 주세요."
 
 step "2/5" "AI 오피스 파일 받기"
 TMP="$(mktemp -d)"
