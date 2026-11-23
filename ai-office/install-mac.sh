@@ -29,8 +29,13 @@ cp -R "$SRC/." "$DEST/"
 echo "✅ 파일 설치 완료: $DEST (버전 $(cat "$DEST/VERSION" 2>/dev/null))"
 
 # 바탕화면 실행 아이콘 만들기 (내 컴퓨터에서 만든 파일이라 보안 경고가 뜨지 않습니다)
-mkdir -p "$HOME/Desktop"
 LAUNCHER="$HOME/Desktop/AI오피스.command"
+# 업데이트 때는 지금 실행 중인 실행 파일을 건드리지 않습니다 (덮어쓰면 실행 중인 창이 꼬일 수 있음)
+if [ "$MODE" = "update" ] && [ -f "$DEST/AI오피스.command" ]; then
+  echo "✅ 업데이트 완료"
+  exit 0
+fi
+mkdir -p "$HOME/Desktop"
 cat > "$LAUNCHER" <<EOF
 #!/bin/zsh -l
 # AI 오피스 실행 — 이 창을 닫으면 사무실도 꺼집니다.

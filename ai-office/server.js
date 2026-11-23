@@ -251,7 +251,7 @@ function buildTaskFile(a, task) {
 }
 
 function quoteWin(arg) {
-  return /[\s"&|<>^]/.test(arg) ? `"${arg.replace(/"/g, '""')}"` : arg;
+  return /[\s"&|<>^(),;=]/.test(arg) ? `"${arg.replace(/"/g, '""')}"` : arg;
 }
 
 function startTask(a, task) {
@@ -564,13 +564,18 @@ async function handle(req, res) {
       const r = await fetch(`${REPO_RAW}/VERSION`, { signal: AbortSignal.timeout(5000), cache: 'no-store' });
       if (r.ok) latest = (await r.text()).trim();
     } catch {}
-    return json(res, { current: VERSION, latest, canUpdate: process.platform !== 'win32' && fs.existsSync(path.join(ROOT, 'install-mac.sh')) });
+    return json(res, { current: VERSION, latest, canUpdate: fs.existsSync(path.join(ROOT, IS_WIN ? 'install-win.ps1' : 'install-mac.sh')) });
   }
   if (p === '/api/update' && req.method === 'POST') {
     if (updating) return json(res, { error: '이미 업데이트 중입니다' }, 409);
     if (order.some((id) => agents[id].current)) return json(res, { error: '일하는 직원이 있어요. 끝난 뒤에 업데이트해 주세요' }, 409);
     updating = true;
-    const child = spawn('bash', [path.join(ROOT, 'install-mac.sh'), '--update'], { cwd: ROOT, env: process.env });
+    const env = { ...process.env, AI_OFFICE_UPDATE: '1', AI_OFFICE_DIR: ROOT };
+    // 윈도우: 한글이 깨지지 않도록 UTF-8로 읽어서 실행
+    const ps = `$s=[IO.File]::ReadAllText('${path.join(ROOT, 'install-win.ps1').replace(/'/g, "''")}',[Text.Encoding]::UTF8); Invoke-Expression $s`;
+    const child = IS_WIN
+      ? spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', ps], { cwd: ROOT, env, windowsHide: true })
+      : spawn('bash', [path.join(ROOT, 'install-mac.sh'), '--update'], { cwd: ROOT, env });
     let out = '';
     child.stdout.on('data', (d) => { out += d; });
     child.stderr.on('data', (d) => { out += d; });
@@ -592,6 +597,14 @@ async function handle(req, res) {
   return serveFile(res, safeJoin(PUBLIC, p.slice(1)));
 }
 
+function openBrowser() {
+  const url = `http://localhost:${PORT}`;
+  try {
+    if (process.platform === 'darwin') spawn('open', [url]);
+    else if (IS_WIN) spawn('cmd', ['/c', 'start', '', url], { windowsHide: true });
+  } catch {}
+}
+
 // 예상 못 한 오류가 나도 사무실 전체가 꺼지지 않게
 process.on('uncaughtException', (e) => console.error('⚠️ 오류 (계속 실행 중):', e));
 process.on('unhandledRejection', (e) => console.error('⚠️ 오류 (계속 실행 중):', e));
@@ -599,8 +612,8 @@ process.on('unhandledRejection', (e) => console.error('⚠️ 오류 (계속 실
 server.on('error', (e) => {
   if (e.code === 'EADDRINUSE') {
     console.log(`\n🏢 AI 오피스가 이미 켜져 있어요 → http://localhost:${PORT}`);
-    if (process.platform === 'darwin') spawn('open', [`http://localhost:${PORT}`]);
-    process.exit(0);
+    openBrowser();
+    setTimeout(() => process.exit(0), 300);
   }
   throw e;
 });
@@ -610,5 +623,5 @@ server.listen(PORT, '127.0.0.1', () => {
   console.log(`\n🏢 AI 오피스 출근 완료! 브라우저에서 여세요 → http://localhost:${PORT}`);
   if (MOCK) console.log('   (연습 모드: 실제 AI 대신 가짜 직원이 일합니다)');
   console.log('   종료: 이 창에서 Ctrl + C\n');
-  if (process.env.OFFICE_OPEN === '1' && process.platform === 'darwin') spawn('open', [`http://localhost:${PORT}`]);
+  if (process.env.OFFICE_OPEN === '1') openBrowser();
 });

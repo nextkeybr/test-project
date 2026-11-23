@@ -50,8 +50,17 @@ curl -fsSL https://raw.githubusercontent.com/nextkeybr/test-project/claude/ecsta
 ### AI 없이 먼저 구경하기 (연습 모드)
 `AI-Office` 폴더에서 `npm run demo`. 가짜 직원들이 일하는 흐름을 보여줍니다. 비용이 들지 않습니다.
 
-### 윈도우
-ZIP으로 받아 `실행-윈도우.bat` 를 더블클릭합니다 (자동 업데이트는 맥만 지원).
+## 2-1. 설치하기 (윈도우) — 한 줄이면 끝
+
+1. 먼저 준비: Node.js(https://nodejs.org), 그리고 PowerShell 에서 Claude Code 설치 `irm https://claude.ai/install.ps1 | iex` 와 `npm install -g @openai/codex` 후 각각 로그인.
+2. 시작 버튼 → `powershell` 입력 → **Windows PowerShell** 을 열고 아래 한 줄을 붙여넣고 Enter:
+
+```powershell
+irm https://raw.githubusercontent.com/nextkeybr/test-project/claude/ecstatic-lovelace-echyjs/ai-office/install-win.ps1 | iex
+```
+
+- 내 사용자 폴더 안 `AI-Office` 에 설치되고, **바탕화면에 `AI오피스` 아이콘**이 생깁니다.
+- 앞으로는 아이콘 더블클릭으로 켜고, 업데이트는 화면의 **✨ 새 버전 업데이트** 버튼으로 합니다.
 
 ## 3. 사용 방법
 
