@@ -4,7 +4,8 @@
     "leadAgent": "secretary",
     "maxParallel": 3,
     "taskTimeoutMinutes": 30,
-    "maxRounds": 4
+    "maxRounds": 4,
+    "fallback": { "codex": "claude" }
   },
   "engines": {
     "claude": {
@@ -48,7 +49,7 @@
       "id": "planner",
       "name": "기획자",
       "nickname": "곰곰",
-      "engine": "claude",
+      "engine": "codex",
       "role": "기획서, 콘텐츠 구성안, 일정표 작성",
       "prop": "🗂️",
       "character": { "type": "bear", "color": "#f3dcc0", "accent": "#ff9fb2" },
@@ -74,7 +75,7 @@
       "id": "developer",
       "name": "개발자",
       "nickname": "냥코",
-      "engine": "claude",
+      "engine": "codex",
       "role": "웹페이지, 자동화 스크립트, 도구 개발",
       "prop": "💻",
       "character": { "type": "cat", "color": "#ffffff", "accent": "#ffb3c7" },

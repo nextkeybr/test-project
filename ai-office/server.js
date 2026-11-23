@@ -43,8 +43,8 @@ for (const a of CFG.agents) {
   for (const sub of ['inbox', 'done', 'output', 'shared']) fs.mkdirSync(path.join(dir, sub), { recursive: true });
   // role.md(원본) → 엔진별 설명서 파일(CLAUDE.md / AGENTS.md / GEMINI.md)로 복사. role.local.md 가 있으면 그걸 우선 사용
   const rolePath = fs.existsSync(path.join(dir, 'role.local.md')) ? path.join(dir, 'role.local.md') : path.join(dir, 'role.md');
-  const engine = CFG.engines[a.engine];
-  if (fs.existsSync(rolePath) && engine?.roleFile) fs.copyFileSync(rolePath, path.join(dir, engine.roleFile));
+  // 대체 AI로 넘어갈 때를 대비해 모든 AI용 설명서를 만들어 둠
+  if (fs.existsSync(rolePath)) for (const e of Object.values(CFG.engines)) if (e.roleFile) fs.copyFileSync(rolePath, path.join(dir, e.roleFile));
   agents[a.id] = { cfg: a, dir, off: false, current: null, queue: [], lastLine: '', log: [] };
   order.push(a.id);
 }
@@ -96,7 +96,7 @@ function snapshot(id) {
     off: a.off,
     queue: a.queue.length,
     lastLine: a.lastLine,
-    current: a.current ? { instruction: a.current.instruction.slice(0, 120), startedAt: a.current.startedAt } : null,
+    current: a.current ? { instruction: a.current.instruction.slice(0, 120), startedAt: a.current.startedAt, engine: a.current.engine || engineKey } : null,
     image: imageFor(id, ''),
     workImage: imageFor(id, '-work'),
   };
@@ -272,8 +272,9 @@ function startTask(a, task) {
     args = [path.join(ROOT, 'mock-agent.js'), id, taskFile];
     parser = 'text';
   } else {
-    const e = CFG.engines[a.cfg.engine];
-    if (!e) return finishTask(a, task, outBefore, false, `엔진 설정을 찾을 수 없습니다: ${a.cfg.engine}`);
+    const engineKey = task.engine || a.cfg.engine;
+    const e = CFG.engines[engineKey];
+    if (!e) return finishTask(a, task, outBefore, false, `엔진 설정을 찾을 수 없습니다: ${engineKey}`);
     cmd = e.cmd;
     args = e.args.map((x) => x.replace('{PROMPT}', prompt).replace('{RESULT_FILE}', resultFile));
     // 직원별로 추가 허용할 도구 (예: 디자이너의 이미지 생성 MCP)
@@ -340,6 +341,20 @@ function startTask(a, task) {
     done = true;
     clearTimeout(timeout);
     if (buf) onLine(buf);
+    // 실패하면 대체 AI로 한 번 더 시도 (예: GPT 사용량이 다 찼을 때 Claude가 이어받기)
+    const failed = errMsg || (!task.cancelled && !task.timedOut && (code !== 0 || isError));
+    const usedEngine = task.engine || a.cfg.engine;
+    const fb = (SET.fallback || {})[usedEngine];
+    if (failed && !MOCK && fb && !task.fallbackUsed && CFG.engines[fb]) {
+      task.fallbackUsed = true;
+      task.engine = fb;
+      log(id, `↪️ ${CFG.engines[usedEngine]?.label || usedEngine} 실패 → ${CFG.engines[fb].label}(으)로 다시 시도합니다`);
+      addChat({ from: 'system', text: `${nameOf(id)}: ${CFG.engines[usedEngine]?.label || usedEngine}에서 오류가 나서 ${CFG.engines[fb].label}(으)로 이어서 합니다.` });
+      a.current = null;
+      try { fs.unlinkSync(taskFile); } catch {}
+      startTask(a, task);
+      return;
+    }
     if (errMsg) return finishTask(a, task, outBefore, false, errMsg);
     if (task.cancelled) return finishTask(a, task, outBefore, false, '대표님 지시로 작업을 중지했습니다.');
     if (task.timedOut) return finishTask(a, task, outBefore, false, `시간 초과(${SET.taskTimeoutMinutes}분)로 중지했습니다.`);
