@@ -62,6 +62,15 @@ function saveChat() {
   }, 300);
 }
 
+// 결과물 파일 정보: 누가, 어떤 요청으로 만들었는지 (이어서 하기 선택 창에서 묶어 보여줌)
+const META_FILE = path.join(DATA, 'files-meta.json');
+let filesMeta = {};
+try { filesMeta = JSON.parse(fs.readFileSync(META_FILE, 'utf8')); } catch { filesMeta = {}; }
+function saveMeta() { fs.writeFile(META_FILE, JSON.stringify(filesMeta, null, 1), () => {}); }
+function filesWithMeta() {
+  return listFiles(SHARED).map((f) => ({ ...f, ...(filesMeta[f.path] || {}) }));
+}
+
 let seq = 0;
 const newId = (p) => {
   const d = new Date();
@@ -134,8 +143,8 @@ function resolveAgent(word) {
   }) || null;
 }
 
-function createJob(to, text) {
-  const job = { id: newId('job'), owner: to, round: 1, open: new Set(), results: [], userText: text, needsReview: false };
+function createJob(to, text, attachments = []) {
+  const job = { id: newId('job'), owner: to, round: 1, open: new Set(), results: [], userText: text, needsReview: false, attachments };
   jobs[job.id] = job;
   enqueue(to, { kind: to === LEAD ? 'lead' : 'direct', instruction: text, from: 'me', job, canDelegate: to === LEAD });
 }
@@ -207,6 +216,31 @@ function resultsText(job, max = 3000) {
   }).join('\n\n');
 }
 
+const TEXT_EXT = new Set(['.md', '.txt', '.html', '.htm', '.csv', '.json', '.svg', '.css', '.js', '.srt']);
+function attachmentsText(list) {
+  const L = ['## 이어서 할 자료 (대표님이 직접 고른 파일)', '아래 자료를 바탕으로 이어서 작업하세요. 파일은 ./shared/ 폴더에도 있습니다.', ''];
+  let budget = 60000;
+  for (const rel of list) {
+    const meta = filesMeta[rel] || {};
+    const by = meta.by ? ` — 만든 사람: ${nameOf(meta.by)}` : '';
+    const req = meta.request ? ` (요청: "${meta.request}")` : '';
+    L.push(`### shared/${rel}${by}${req}`);
+    const abs = path.join(SHARED, rel);
+    if (TEXT_EXT.has(path.extname(rel).toLowerCase()) && budget > 0) {
+      try {
+        let body = fs.readFileSync(abs, 'utf8');
+        if (body.length > Math.min(20000, budget)) body = body.slice(0, Math.min(20000, budget)) + '\n…(길어서 뒷부분 생략, 전체는 파일에서 확인)';
+        budget -= body.length;
+        L.push('```', body, '```');
+      } catch {}
+    } else {
+      L.push('(이미지·기타 파일입니다. 필요하면 파일을 직접 열어 보세요.)');
+    }
+    L.push('');
+  }
+  return L.join('\n');
+}
+
 function buildTaskFile(a, task) {
   const job = jobs[task.jobId];
   const c = a.cfg;
@@ -218,6 +252,7 @@ function buildTaskFile(a, task) {
   L.push('');
   if (task.kind === 'review') {
     L.push('## 대표님의 원래 요청', job.userText, '');
+    if (job.attachments.length) L.push(`(대표님이 고른 자료: ${job.attachments.map((f) => 'shared/' + f).join(', ')})`, '');
     L.push(`## 지금까지 팀원 결과 (${job.round}번째 차례)`, resultsText(job), '');
     L.push('## 할 일');
     if (task.canDelegate) {
@@ -228,6 +263,7 @@ function buildTaskFile(a, task) {
     }
   } else {
     L.push('## 지시 내용', task.instruction, '');
+    if (job.attachments.length) L.push(attachmentsText(job.attachments), '');
     if (task.kind === 'delegated') {
       L.push('## 참고: 대표님의 원래 요청', job.userText, '');
       const prev = job.results.filter((r) => r.agentId !== LEAD);
@@ -398,15 +434,19 @@ function finishTask(a, task, outBefore, ok, text) {
     let dest = f.path;
     const srcAbs = path.join(a.dir, 'output', f.path);
     const exists = path.join(SHARED, dest);
-    if (fs.existsSync(exists) && !fs.readFileSync(exists).equals(fs.readFileSync(srcAbs))) {
-      const prefixed = `${id}-${dest}`;
-      if (!fs.existsSync(path.join(SHARED, prefixed))) dest = prefixed;
+    // 같은 이름 파일이 이미 있으면: 같은 업무 안에서 고친 거면 덮어쓰고, 다른 날·다른 업무 거면 이름 뒤에 -2, -3 을 붙여 둘 다 남김
+    if (fs.existsSync(exists) && filesMeta[dest]?.jobId !== job.id) {
+      const ext = path.extname(dest), stem = dest.slice(0, dest.length - ext.length);
+      let n = 2;
+      while (fs.existsSync(path.join(SHARED, `${stem}-${n}${ext}`)) && filesMeta[`${stem}-${n}${ext}`]?.jobId !== job.id) n++;
+      dest = `${stem}-${n}${ext}`;
     }
     fs.mkdirSync(path.dirname(path.join(SHARED, dest)), { recursive: true });
     fs.copyFileSync(srcAbs, path.join(SHARED, dest));
     files.push(dest);
+    filesMeta[dest] = { by: id, jobId: job.id, request: job.userText.slice(0, 100), time: Date.now() };
   } catch (e) { log(id, `⚠️ 결과 파일 복사 실패: ${f.path} (${e.message})`); }
-  if (files.length) emit('files', listFiles(SHARED));
+  if (files.length) { saveMeta(); emit('files', filesWithMeta()); }
 
   // 업무 나누기 블록 해석
   const delegations = [];
@@ -516,7 +556,7 @@ async function handle(req, res) {
       agents: order.map(snapshot),
       logs: Object.fromEntries(order.map((id) => [id, agents[id].log.slice(-200)])),
       chat: chat.slice(-200),
-      files: listFiles(SHARED),
+      files: filesWithMeta(),
     });
   }
   if (p === '/api/message' && req.method === 'POST') {
@@ -526,8 +566,10 @@ async function handle(req, res) {
     const m = text.match(/^@(\S+)\s*([\s\S]*)$/);
     if (m && resolveAgent(m[1])) { to = resolveAgent(m[1]); text = m[2].trim(); }
     if (!text) return json(res, { error: '내용이 비어 있습니다' }, 400);
-    addChat({ from: 'me', to, text });
-    createJob(to, text);
+    const attachments = (Array.isArray(body.attachments) ? body.attachments : []).slice(0, 30).map(String)
+      .filter((f) => { const abs = safeJoin(SHARED, encodeURIComponent(f)); return abs && fs.existsSync(abs) && fs.statSync(abs).isFile(); });
+    addChat({ from: 'me', to, text, files: attachments });
+    createJob(to, text, attachments);
     return json(res, { ok: true, to });
   }
   // 캐릭터 이미지 바꾸기 (화면에 끌어다 놓기)

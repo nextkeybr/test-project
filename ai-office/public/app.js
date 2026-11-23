@@ -200,20 +200,115 @@ async function init() {
   es.addEventListener('files', (ev) => { S.files = JSON.parse(ev.data); renderFiles(); });
 }
 
-$('#chatForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const t = $('#chatInput').value.trim();
-  if (!t) return;
-  $('#chatInput').value = '';
-  await api('/api/message', { text: t, to: S.lead });
+// ---------- 보내기 + 이어서 하기 (지난 결과물 고르기) ----------
+const ATT = { chat: [], c: [] };
+const CONTINUE_RE = /이어서|이어가|이어 가|이어하|계속 이어|어제\s*(작업|한|만든|하던)|지난번|저번에?\s*(작업|한|만든)/;
+const FORM = {
+  chat: { input: '#chatInput', chips: '#chatAtt', to: () => S.lead },
+  c: { input: '#cInput', chips: '#cAtt', to: () => S.selected },
+};
+function dayLabel(t) {
+  const d = new Date(t), now = new Date();
+  const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diff = Math.round((day(now) - day(d)) / 86400000);
+  if (diff === 0) return '오늘';
+  if (diff === 1) return '어제';
+  if (diff < 7) return `${diff}일 전`;
+  return `${d.getMonth() + 1}월 ${d.getDate()}일`;
+}
+function renderAtt(k) {
+  const box = $(FORM[k].chips);
+  box.classList.toggle('hidden', !ATT[k].length);
+  box.innerHTML = ATT[k].map((f, i) => `<span class="att"><span>📎 ${esc(f)}</span><button type="button" data-i="${i}" title="빼기">×</button></span>`).join('');
+  box.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { ATT[k].splice(+b.dataset.i, 1); renderAtt(k); }));
+}
+async function submitFrom(k) {
+  const input = $(FORM[k].input);
+  const t = input.value.trim();
+  const to = FORM[k].to();
+  if (!t || !to) return;
+  const send = async () => {
+    input.value = '';
+    const attachments = ATT[k];
+    ATT[k] = [];
+    renderAtt(k);
+    await api('/api/message', { text: t, to, attachments });
+  };
+  if (!ATT[k].length && CONTINUE_RE.test(t) && S.files.length) {
+    return openPicker(k, send, '어떤 작업을 이어갈까요? 고르고 "선택 완료"를 누르면 바로 보냅니다.');
+  }
+  send();
+}
+$('#chatForm').addEventListener('submit', (e) => { e.preventDefault(); submitFrom('chat'); });
+$('#cForm').addEventListener('submit', (e) => { e.preventDefault(); submitFrom('c'); });
+
+let PK = null;
+function groupFiles() {
+  const groups = new Map();
+  for (const f of S.files) {
+    const key = f.jobId || `etc-${dayLabel(f.mtime)}`;
+    if (!groups.has(key)) groups.set(key, { title: f.request || '기타 파일', time: 0, by: new Set(), files: [] });
+    const g = groups.get(key);
+    g.files.push(f);
+    g.time = Math.max(g.time, f.time || f.mtime);
+    if (f.by && S.agents[f.by]) g.by.add(S.agents[f.by].name);
+  }
+  return [...groups.values()].sort((a, b) => b.time - a.time);
+}
+function openPicker(k, sendAfter, note) {
+  if (!S.files.length) return toast('아직 결과물이 없어요');
+  PK = { k, sendAfter, groups: groupFiles() };
+  const chosen = new Set(ATT[k]);
+  $('#pkNote').textContent = note || '지난 작업 결과물을 골라 주세요. 여러 개를 고를 수 있어요.';
+  $('#pkSkip').classList.toggle('hidden', !sendAfter);
+  $('#pkList').innerHTML = PK.groups.map((g, gi) => `
+    <div class="pk-group">
+      <label class="pk-gh"><input type="checkbox" class="gcb" data-g="${gi}">
+        <div><b>${g.title === '기타 파일' ? '기타 파일' : '“' + esc(g.title) + '”'}</b>
+        <small>${dayLabel(g.time)} · ${[...g.by].map(esc).join(', ') || '직원'} · 파일 ${g.files.length}개</small></div></label>
+      <div class="pk-files">${g.files.sort((a, b) => a.path.localeCompare(b.path)).map((f) => `
+        <label><input type="checkbox" class="fcb" data-g="${gi}" value="${esc(f.path)}" ${chosen.has(f.path) ? 'checked' : ''}>
+        <span>${esc(f.path)}</span><small>${f.by && S.agents[f.by] ? esc(S.agents[f.by].name) : ''}</small></label>`).join('')}
+      </div>
+    </div>`).join('');
+  const sync = () => {
+    PK.groups.forEach((g, gi) => {
+      const boxes = [...document.querySelectorAll(`.fcb[data-g="${gi}"]`)];
+      const n = boxes.filter((b) => b.checked).length;
+      const gcb = document.querySelector(`.gcb[data-g="${gi}"]`);
+      gcb.checked = n === boxes.length;
+      gcb.indeterminate = n > 0 && n < boxes.length;
+    });
+    const total = document.querySelectorAll('.fcb:checked').length;
+    $('#pkOk').textContent = total ? `선택 완료 (${total}개)${PK.sendAfter ? ' · 보내기' : ''}` : '선택 완료';
+  };
+  document.querySelectorAll('.gcb').forEach((g) => g.addEventListener('change', () => {
+    document.querySelectorAll(`.fcb[data-g="${g.dataset.g}"]`).forEach((b) => { b.checked = g.checked; });
+    sync();
+  }));
+  document.querySelectorAll('.fcb').forEach((b) => b.addEventListener('change', sync));
+  sync();
+  $('#picker').classList.remove('hidden');
+}
+function closePicker() { $('#picker').classList.add('hidden'); PK = null; }
+document.querySelectorAll('.clip').forEach((b) => b.addEventListener('click', () => openPicker(b.dataset.for)));
+$('#pkClose').addEventListener('click', closePicker);
+$('#picker').addEventListener('click', (e) => { if (e.target.id === 'picker') closePicker(); });
+$('#pkOk').addEventListener('click', () => {
+  if (!PK) return;
+  const { k, sendAfter } = PK;
+  ATT[k] = [...document.querySelectorAll('.fcb:checked')].map((b) => b.value);
+  renderAtt(k);
+  closePicker();
+  if (sendAfter) sendAfter();
 });
-$('#cForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const t = $('#cInput').value.trim();
-  if (!t || !S.selected) return;
-  $('#cInput').value = '';
-  await api('/api/message', { text: t, to: S.selected });
+$('#pkSkip').addEventListener('click', () => {
+  if (!PK) return;
+  const { sendAfter } = PK;
+  closePicker();
+  if (sendAfter) sendAfter();
 });
+
 $('#cToggle').addEventListener('click', () => S.selected && api(`/api/agent/${S.selected}/toggle`));
 $('#cStop').addEventListener('click', () => S.selected && api(`/api/agent/${S.selected}/stop`));
 $('#allOn').addEventListener('click', () => api('/api/all', { off: false }));
