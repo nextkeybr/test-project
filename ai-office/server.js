@@ -37,14 +37,18 @@ const os = require('os');
 const RUNTIME = path.join(ROOT, 'runtime');
 const NPM_PREFIX = path.join(RUNTIME, 'npm');
 const extraPath = IS_WIN
-  ? [path.join(RUNTIME, 'node'), NPM_PREFIX, path.join(os.homedir(), '.local', 'bin')]
+  ? [path.join(RUNTIME, 'node'), NPM_PREFIX, path.join(RUNTIME, 'git', 'cmd'), path.join(os.homedir(), '.local', 'bin')]
   : [path.join(RUNTIME, 'node', 'bin'), path.join(NPM_PREFIX, 'bin'), path.join(os.homedir(), '.local', 'bin'), '/opt/homebrew/bin', '/usr/local/bin'];
 process.env.PATH = [...extraPath, process.env.PATH].join(path.delimiter);
+// 윈도우: 설치 프로그램이 받아 둔 휴대용 Git을 Claude Code가 쓰도록 알려줌
+const PORTABLE_BASH = path.join(RUNTIME, 'git', 'bin', 'bash.exe');
+if (IS_WIN && !process.env.CLAUDE_CODE_GIT_BASH_PATH && fs.existsSync(PORTABLE_BASH)) process.env.CLAUDE_CODE_GIT_BASH_PATH = PORTABLE_BASH;
 
 // ---------- 오류를 쉬운 말로 바꾸기 ----------
 function explainError(text) {
   const t = String(text || '');
   const rules = [
+    [/'?winget'? is not recognized|winget.*(not found|찾을 수 없)/i, '이 PC에는 winget(앱 설치 도구)이 없어요', 'Microsoft Store에서 "앱 설치 관리자(App Installer)"를 업데이트한 뒤 다시 눌러 주세요. ffmpeg은 선택 사항이라 없어도 사무실은 쓸 수 있어요.', null],
     [/ENOENT|is not recognized|not recognized as|command not found|찾을 수 없습니다|No such file or directory.*(claude|codex)/i, '프로그램이 설치되어 있지 않아요', '🩺 시작 준비 창에서 [설치하기]를 눌러 주세요.', 'setup'],
     [/not logged in|log ?in required|please (log|sign) ?in|unauthori[sz]ed|\b401\b|invalid.*(token|credential)|auth(entication)? (failed|error)|expired.*token|token.*expired|run .*login/i, 'AI 로그인이 풀렸어요', '🩺 시작 준비 창에서 [로그인하기]를 눌러 다시 로그인해 주세요.', 'setup'],
     [/rate.?limit|usage limit|quota|\b429\b|too many requests|limit reached|exceeded your|weekly limit|5-hour limit/i, 'AI 사용량 한도에 걸렸어요', '잠시 뒤에 다시 시키거나, ⚙️ 직원 관리에서 이 직원의 AI를 다른 것으로 바꿔 주세요.', 'manager'],
@@ -1024,7 +1028,7 @@ async function setupStatus() {
   }
   const ff = await runQuiet('ffmpeg', ['-version'], 10000);
   HAS_FFMPEG = ff.code === 0;
-  const git = IS_WIN ? (await runQuiet('git', ['--version'], 10000)).code === 0 : true;
+  const git = IS_WIN ? (fs.existsSync(PORTABLE_BASH) || (await runQuiet('git', ['--version'], 10000)).code === 0) : true;
   return { platform: process.platform, engines, ffmpeg: HAS_FFMPEG, git, busy: setupBusy };
 }
 let setupProc = null, setupBusy = null;
@@ -1041,7 +1045,7 @@ function setupCommand(kind, what) {
     if (what === 'ffmpeg') return IS_WIN
       ? ['winget', ['install', '-e', '--id', 'Gyan.FFmpeg', '--accept-package-agreements', '--accept-source-agreements']]
       : ['brew', ['install', 'ffmpeg']];
-    if (what === 'git' && IS_WIN) return ['winget', ['install', '-e', '--id', 'Git.Git', '--accept-package-agreements', '--accept-source-agreements']];
+    if (what === 'git' && IS_WIN) return ['powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(ROOT, 'win-git.ps1'), '-Dest', ROOT]];
   }
   return null;
 }
@@ -1075,6 +1079,7 @@ function runSetupTask(kind, what) {
       setupProc = null;
       setupBusy = null;
       if (kind === 'install') {
+        if (what === 'git' && fs.existsSync(PORTABLE_BASH)) process.env.CLAUDE_CODE_GIT_BASH_PATH = PORTABLE_BASH;
         await checkEngine(what).catch(() => {});
         if (what === 'ffmpeg') HAS_FFMPEG = (await runQuiet('ffmpeg', ['-version'], 10000)).code === 0;
       }

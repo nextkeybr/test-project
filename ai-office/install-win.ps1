@@ -78,6 +78,16 @@ function Invoke-AIOfficeInstall {
     }
 
     Step '4/5' 'AI 프로그램 준비 (Claude Code, Codex)'
+    # 윈도우용 Claude Code는 Git Bash를 씁니다. Git이 없으면 관리자 권한 없이 쓰는 휴대용 Git을 받아 둡니다.
+    $gitBash = Join-Path $Runtime 'git\bin\bash.exe'
+    if (-not (Has 'git') -and -not (Test-Path $gitBash)) {
+      Write-Host '   Git 준비 중... (윈도우용 Claude Code에 필요, 1~2분)'
+      $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+      try { & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Dest 'win-git.ps1') -Dest $Dest } catch {}
+      $ErrorActionPreference = $old
+      if (Test-Path $gitBash) { Ok 'Git 준비 완료' } else { Write-Host "   [!] Git 준비가 끝나지 않았어요. 사무실의 '시작 준비'에서 다시 시도할 수 있어요." -ForegroundColor Yellow }
+    }
+    if (Test-Path $gitBash) { $env:CLAUDE_CODE_GIT_BASH_PATH = $gitBash; Add-Path (Join-Path $Runtime 'git\cmd') }
     if (Has 'claude') { Ok 'Claude Code 이미 있어요' } else {
       Write-Host '   Claude Code 설치 중...'
       try { & powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://claude.ai/install.ps1 | iex" } catch {}
@@ -86,7 +96,12 @@ function Invoke-AIOfficeInstall {
     }
     if (Has 'codex') { Ok 'Codex 이미 있어요' } else {
       Write-Host '   Codex 설치 중...'
-      try { & npm.cmd install -g --prefix (Join-Path $Runtime 'npm') '@openai/codex@latest' 2>&1 | Out-Null } catch {}
+      # 윈도우 PowerShell 5.1은 npm의 단순 경고도 오류로 착각할 수 있어 cmd로 실행하고 기록은 파일로 남깁니다
+      $npmLog = Join-Path $Dest 'install-npm-log.txt'
+      $prefix = Join-Path $Runtime 'npm'
+      $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+      try { & cmd.exe /d /s /c "npm install -g --prefix `"$prefix`" @openai/codex@latest > `"$npmLog`" 2>&1" } catch {}
+      $ErrorActionPreference = $old
       Add-Path (Join-Path $Runtime 'npm')
       if (Has 'codex') { Ok 'Codex 설치 완료' } else { Write-Host "   [!] Codex 설치가 끝나지 않았어요. 사무실의 '시작 준비'에서 다시 시도할 수 있어요." -ForegroundColor Yellow }
     }
@@ -96,7 +111,8 @@ function Invoke-AIOfficeInstall {
 @echo off
 title AI Office
 cd /d "%~dp0"
-set "PATH=%~dp0runtime\node;%~dp0runtime\npm;%USERPROFILE%\.local\bin;%PATH%"
+set "PATH=%~dp0runtime\node;%~dp0runtime\npm;%~dp0runtime\git\cmd;%USERPROFILE%\.local\bin;%PATH%"
+if exist "%~dp0runtime\git\bin\bash.exe" set "CLAUDE_CODE_GIT_BASH_PATH=%~dp0runtime\git\bin\bash.exe"
 set OFFICE_OPEN=1
 :loop
 node server.js
