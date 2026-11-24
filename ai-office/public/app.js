@@ -215,6 +215,8 @@ async function init() {
   if (st.mock) $('#mockBadge').classList.remove('hidden');
   S.ffmpeg = st.ffmpeg;
   S.engines = st.engines || [];
+  S.appIcons = st.appIcons || [];
+  setIcon(st.desktopIcon);
   S.charTypes = st.charTypes || [];
   buildScene(st.background);
   renderStaff(); renderChat(); renderFiles(); renderConsole(true);
@@ -253,6 +255,7 @@ async function init() {
   es.addEventListener('chat', (ev) => { S.chat.push(JSON.parse(ev.data)); renderChat(); });
   es.addEventListener('files', (ev) => { S.files = JSON.parse(ev.data); renderFiles(); });
   es.addEventListener('roster', () => location.reload());
+  es.addEventListener('desktop-icon', (ev) => setIcon(JSON.parse(ev.data).name));
   es.addEventListener('setup-log', (ev) => {
     const pre = $('#suLog');
     pre.textContent += (pre.textContent ? '\n' : '') + JSON.parse(ev.data).line;
@@ -745,7 +748,24 @@ $('#mgForm').addEventListener('submit', async (e) => {
 function suRow(ic, title, desc, ok, btns) {
   return `<div class="su-row ${ok ? 'ok' : 'todo'}"><span class="su-ic">${ic}</span><div class="su-main"><b>${title}</b><small>${desc}</small></div>${btns || ''}</div>`;
 }
+function setIcon(name) {
+  if (!name) return;
+  S.desktopIcon = name;
+  $('#favicon').href = `app-icons/${name}.png`;
+  renderIconPick();
+}
+function renderIconPick() {
+  const box = $('#iconPick');
+  if (!box) return;
+  const label = { robot: '비서 로봇', laptop: '노트북', chair: '의자', documents: '서류', calendar: '캘린더' };
+  box.innerHTML = (S.appIcons || []).map((n) => `<button type="button" class="${n === S.desktopIcon ? 'on' : ''}" data-icon="${n}" title="${label[n] || n}"><img src="app-icons/${n}.png" alt="${label[n] || n}"></button>`).join('');
+  box.querySelectorAll('button').forEach((b) => b.addEventListener('click', async () => {
+    const j = await api('/api/desktop-icon', { name: b.dataset.icon });
+    if (j.ok) { setIcon(b.dataset.icon); toast(j.warn || '바탕화면 아이콘을 바꿨어요 ✨'); }
+  }));
+}
 function renderSetup(su) {
+  renderIconPick();
   const rows = [];
   rows.push(suRow('✅', 'AI 오피스', '설치 완료', true));
   if (su.platform === 'win32' && !su.git) rows.push(suRow('🧰', 'Git (윈도우용 Claude Code에 필요할 수 있음)', 'Claude Code가 "Git이 필요하다"고 하면 설치하세요.', false, `<button class="btn sm" data-su="install:git">Git 설치하기</button>`));

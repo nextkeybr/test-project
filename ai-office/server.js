@@ -718,7 +718,7 @@ async function handle(req, res) {
   if (p === '/api/state') {
     const bg = backgroundUrl();
     return json(res, {
-      lead: LEAD, mock: MOCK, background: bg, ffmpeg: HAS_FFMPEG, engines: enginesInfo(), charTypes: CHAR_TYPES,
+      lead: LEAD, mock: MOCK, background: bg, ffmpeg: HAS_FFMPEG, desktopIcon: currentIcon(), appIcons: APP_ICONS, engines: enginesInfo(), charTypes: CHAR_TYPES,
       agents: order.map(snapshot),
       logs: Object.fromEntries(order.map((id) => [id, agents[id].log.slice(-200)])),
       chat: chat.slice(-200),
@@ -850,6 +850,16 @@ async function handle(req, res) {
   if (p === '/api/setup/cancel' && req.method === 'POST') {
     if (setupProc) { killTree(setupProc); setupProc = null; }
     return json(res, { ok: true });
+  }
+  if (p === '/api/desktop-icon' && req.method === 'POST') {
+    const body = await readBody(req);
+    const name = String(body.name || '');
+    if (!APP_ICONS.includes(name)) return json(res, { error: '없는 아이콘이에요' }, 400);
+    const err = MOCK ? null : await applyDesktopIcon(name);
+    SET.desktopIcon = name;
+    try { const local = readLocal(); local.settings = { ...(local.settings || {}), desktopIcon: name }; fs.writeFileSync(LOCAL_PATH, JSON.stringify(local, null, 2)); } catch {}
+    emit('desktop-icon', { name });
+    return json(res, err ? { ok: true, warn: err } : { ok: true });
   }
   // 직원 추가
   if (p === '/api/agents' && req.method === 'POST') {
@@ -1110,6 +1120,34 @@ function runSetupTask(kind, what) {
     proc.on('error', (e) => end(-1, e.code === 'ENOENT' ? `${c[0]} 프로그램을 찾을 수 없음 (ENOENT)` : e.message));
     proc.on('close', (code) => end(code));
   });
+}
+
+// ---------- 바탕화면 아이콘 고르기 ----------
+const APP_ICONS = ['robot', 'laptop', 'chair', 'documents', 'calendar'];
+const currentIcon = () => (APP_ICONS.includes(SET.desktopIcon) ? SET.desktopIcon : 'robot');
+async function applyDesktopIcon(name) {
+  const png = path.join(PUBLIC, 'app-icons', `${name}.png`);
+  const ico = path.join(PUBLIC, 'app-icons', `${name}.ico`);
+  if (IS_WIN) {
+    const ps = `$d=[Environment]::GetFolderPath('Desktop'); $l=Join-Path $d 'AI오피스.lnk'
+if (-not (Test-Path $l)) { exit 3 }
+$s=(New-Object -ComObject WScript.Shell).CreateShortcut($l); $s.IconLocation='${ico.replace(/'/g, "''")},0'; $s.Save()
+try { & ie4uinit.exe -show } catch {}`;
+    const r = await runQuiet('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', Buffer.from(ps, 'utf16le').toString('base64')], 30000);
+    if (r.code === 3) return '바탕화면에 AI오피스 바로가기가 없어요. 설치를 한 번 더 실행하면 다시 만들어져요';
+    return r.code === 0 ? null : '아이콘을 바꾸지 못했어요';
+  }
+  if (process.platform === 'darwin') {
+    const targets = [path.join(os.homedir(), 'Desktop', 'AI오피스.command'), path.join(ROOT, 'AI오피스.command')].filter((f) => fs.existsSync(f));
+    if (!targets.length) return '바탕화면에 AI오피스 아이콘 파일이 없어요. 설치를 한 번 더 실행하면 다시 만들어져요';
+    for (const t of targets) {
+      const js = `ObjC.import('AppKit'); var img = $.NSImage.alloc.initWithContentsOfFile(${JSON.stringify(png)}); $.NSWorkspace.sharedWorkspace.setIconForFileOptions(img, ${JSON.stringify(t)}, 0) ? 'ok' : 'fail'`;
+      const r = await runQuiet('osascript', ['-l', 'JavaScript', '-e', js], 20000);
+      if (!/ok/.test(r.out)) return '아이콘을 바꾸지 못했어요';
+    }
+    return null;
+  }
+  return null; // 그 밖의 OS: 화면(탭) 아이콘만 바뀜
 }
 
 // ---------- 사무실 배경 ----------

@@ -141,7 +141,11 @@ pause >nul
     $Lnk.TargetPath = $Bat
     $Lnk.WorkingDirectory = $Dest
     $Lnk.Description = 'AI 오피스 열기'
-    $Lnk.IconLocation = "$env:SystemRoot\System32\imageres.dll,186"
+    # 바탕화면 아이콘: 내가 고른 아이콘(없으면 비서 로봇)
+    $iconName = 'robot'
+    try { $lc = Get-Content (Join-Path $Dest 'agents.local.json') -Raw -Encoding UTF8 | ConvertFrom-Json; if ($lc.settings.desktopIcon) { $iconName = $lc.settings.desktopIcon } } catch {}
+    $ico = Join-Path $Dest "public\app-icons\$iconName.ico"
+    $Lnk.IconLocation = if (Test-Path $ico) { "$ico,0" } else { "$env:SystemRoot\System32\imageres.dll,186" }
     $Lnk.Save()
     Ok "바탕화면에 'AI오피스' 아이콘을 만들었어요"
 

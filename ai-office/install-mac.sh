@@ -100,6 +100,14 @@ done
 EOF
 chmod +x "$LAUNCHER"
 cp "$LAUNCHER" "$DEST/AI오피스.command"
+# 바탕화면 아이콘 모양: 내가 고른 아이콘(없으면 비서 로봇)
+ICON="$(node -e "try{const s=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8').replace(/^\uFEFF/,'')).settings||{};console.log(s.desktopIcon||'robot')}catch(e){console.log('robot')}" "$DEST/agents.local.json" 2>/dev/null)"
+PNG="$DEST/public/app-icons/${ICON:-robot}.png"
+if [ -f "$PNG" ]; then
+  for F in "$LAUNCHER" "$DEST/AI오피스.command"; do
+    osascript -l JavaScript -e "ObjC.import('AppKit'); \$.NSWorkspace.sharedWorkspace.setIconForFileOptions(\$.NSImage.alloc.initWithContentsOfFile('$PNG'), '$F', 0)" >/dev/null 2>&1 || true
+  done
+fi
 echo "   ✅ 바탕화면에 'AI오피스' 아이콘을 만들었어요"
 
 echo ""
