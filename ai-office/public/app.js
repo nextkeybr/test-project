@@ -713,6 +713,7 @@ function renderManager() {
     await fetch(`/api/agents/${id}`, { method: 'DELETE', headers: { 'X-Office': '1' } }).then((r) => r.json()).then((j) => j.error && toast(j.error));
   }));
   $('#mgEngine').innerHTML = engineOptions('codex');
+  $('#mgAllEngine').innerHTML = engineOptions(S.agents[S.lead]?.engine || 'codex');
   $('#mgType').innerHTML = S.charTypes.map((t) => `<option value="${t}">${{ bunny: '토끼', bear: '곰', cat: '고양이', dog: '강아지', hamster: '햄스터', chick: '병아리' }[t] || t}</option>`).join('');
 }
 async function openManager() {
@@ -723,6 +724,12 @@ async function openManager() {
   if (j.engines) { S.engines = j.engines; renderManager(); }
 }
 $('#mgBtn').addEventListener('click', openManager);
+$('#mgAllBtn').addEventListener('click', async () => {
+  const sel = $('#mgAllEngine');
+  if (!confirm(`모든 직원의 AI를 ${sel.options[sel.selectedIndex].text}(으)로 바꿀까요?`)) return;
+  const j = await api('/api/agents/engine-all', { engine: sel.value });
+  if (!j.error) { toast('모든 직원에게 적용했어요 ✅'); renderManager(); }
+});
 $('#cEngine').addEventListener('click', openManager);
 $('#mgClose').addEventListener('click', () => $('#mgr').classList.add('hidden'));
 $('#mgr').addEventListener('click', (e) => { if (e.target.id === 'mgr') $('#mgr').classList.add('hidden'); });
@@ -744,7 +751,7 @@ function renderSetup(su) {
   if (su.platform === 'win32' && !su.git) rows.push(suRow('🧰', 'Git (윈도우용 Claude Code에 필요할 수 있음)', 'Claude Code가 "Git이 필요하다"고 하면 설치하세요.', false, `<button class="btn sm" data-su="install:git">Git 설치하기</button>`));
   for (const e of su.engines) {
     const users = S.order.filter((id) => S.agents[id].engine === e.key).map((id) => S.agents[id].name).join(', ');
-    const desc = users ? `쓰는 직원: ${esc(users)}` : e.needed ? '다른 AI가 멈추면 대신 일해요' : '지금 쓰는 직원 없음 (선택)';
+    const desc = users ? `쓰는 직원: ${esc(users)}` : e.backup ? '선택: 다른 AI가 멈추면 대신 일해요 (없어도 됨)' : '지금 쓰는 직원 없음 (선택)';
     if (!e.installed) rows.push(suRow('⬇️', `${esc(e.label)} — 설치 필요`, desc, false, `<button class="btn sm dark" data-su="install:${e.key}">설치하기</button>`));
     else if (e.loggedIn === false) rows.push(suRow('🔑', `${esc(e.label)} — 로그인 필요`, desc + (e.key === 'claude' ? ' · Claude 유료 구독 계정으로 로그인' : e.key === 'codex' ? ' · ChatGPT 계정으로 로그인' : ''), false, `<button class="btn sm dark" data-su="login:${e.key}">로그인하기</button>`));
     else rows.push(suRow('✅', `${esc(e.label)}`, desc + ' · 준비 완료', true, `<button class="btn sm" data-su="install:${e.key}" title="최신 버전으로 다시 설치">업데이트</button>`));

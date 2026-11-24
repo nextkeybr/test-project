@@ -468,7 +468,7 @@ function startTask(a, task) {
   }, (SET.taskTimeoutMinutes || 30) * 60 * 1000);
 
   let done = false;
-  const end = (code, errMsg) => {
+  const end = async (code, errMsg) => {
     if (done) return;
     done = true;
     clearTimeout(timeout);
@@ -477,7 +477,9 @@ function startTask(a, task) {
     const failed = errMsg || (!task.cancelled && !task.timedOut && (code !== 0 || isError));
     const usedEngine = task.engine || a.cfg.engine;
     const fb = (SET.fallback || {})[usedEngine];
-    if (failed && !MOCK && fb && !task.fallbackUsed && CFG.engines[fb]) {
+    // 대체 AI가 설치·로그인돼 있을 때만 넘김 (예: Claude 무료 계정이면 넘기지 않음)
+    const fbReady = failed && !MOCK && fb && !task.fallbackUsed && CFG.engines[fb] && engineAvail[fb] !== false && (await loggedIn(fb).catch(() => false)) !== false;
+    if (fbReady) {
       task.fallbackUsed = true;
       task.engine = fb;
       log(id, `↪️ ${CFG.engines[usedEngine]?.label || usedEngine} 실패 → ${CFG.engines[fb].label}(으)로 다시 시도합니다`);
@@ -896,6 +898,14 @@ async function handle(req, res) {
     pushAgent(em[1]);
     return json(res, { ok: true });
   }
+  if (p === '/api/agents/engine-all' && req.method === 'POST') {
+    const body = await readBody(req);
+    const key = String(body.engine || '');
+    if (!CFG.engines[key]) return json(res, { error: '알 수 없는 AI예요' }, 400);
+    try { for (const id of order) { updateLocalAgent(id, { engine: key }); agents[id].cfg.engine = key; pushAgent(id); } } catch (e) { return json(res, { error: e.message }, 500); }
+    addChat({ from: 'system', text: `모든 직원의 AI를 ${CFG.engines[key].label}(으)로 바꿨어요` });
+    return json(res, { ok: true });
+  }
   if (p === '/api/engines' && req.method === 'POST') {
     await Promise.all(Object.keys(CFG.engines).map(checkEngine));
     return json(res, { engines: enginesInfo() });
@@ -1024,7 +1034,7 @@ async function setupStatus() {
   const engines = [];
   for (const key of keys) {
     const installed = MOCK ? true : await checkEngine(key);
-    engines.push({ key, label: CFG.engines[key].label, installed, loggedIn: installed ? await loggedIn(key) : false, needed: used.has(key) || [...used].some((u) => (SET.fallback || {})[u] === key) });
+    engines.push({ key, label: CFG.engines[key].label, installed, loggedIn: installed ? await loggedIn(key) : false, needed: used.has(key), backup: !used.has(key) && [...used].some((u) => (SET.fallback || {})[u] === key) });
   }
   const ff = await runQuiet('ffmpeg', ['-version'], 10000);
   HAS_FFMPEG = ff.code === 0;
