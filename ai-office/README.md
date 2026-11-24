@@ -21,6 +21,8 @@ AI 직원 6명이 귀여운 사무실에서 실제로 일하는 개인용 대시
 Node.js, Claude Code, Codex가 없으면 **알아서 설치**합니다. 관리자 비밀번호는 필요 없어요.
 
 ### 윈도우
+그림 안내: [docs/install-guide-windows.png](docs/install-guide-windows.png)
+
 1. 키보드에서 **윈도우키 + R** 을 누릅니다 (실행 창이 뜹니다).
 2. 아래 한 줄을 붙여넣고 **Enter**:
 
