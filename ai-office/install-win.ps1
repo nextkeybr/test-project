@@ -10,6 +10,7 @@ function Invoke-AIOfficeInstall {
   $ProgressPreference = 'SilentlyContinue'
   [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
   $Update = $env:AI_OFFICE_UPDATE -eq '1'
+  $GptOnly = $env:AI_OFFICE_PROFILE -eq 'gpt'   # GPT 전용 설치: Claude 없이 ChatGPT 계정만으로 사용
   $Dest = if ($env:AI_OFFICE_DIR) { $env:AI_OFFICE_DIR } else { Join-Path $env:USERPROFILE 'AI-Office' }
   $Branch = 'claude/ecstatic-lovelace-echyjs'
   $Url = "https://codeload.github.com/nextkeybr/test-project/tar.gz/refs/heads/$Branch"
@@ -53,6 +54,15 @@ function Invoke-AIOfficeInstall {
     $Bat = Join-Path $Dest 'AI-Office.bat'
     if ($Update -and (Test-Path $Bat)) { Write-Host '[OK] 업데이트 완료'; return }
 
+    # GPT 전용: 모든 직원을 Codex(GPT)로, Claude로 넘기기 끄기 (내 설정이 이미 있으면 건드리지 않음)
+    $LocalCfg = Join-Path $Dest 'agents.local.json'
+    if ($GptOnly -and -not (Test-Path $LocalCfg)) {
+      $ids = (Get-Content (Join-Path $Dest 'agents.json') -Raw -Encoding UTF8 | ConvertFrom-Json).agents | ForEach-Object { $_.id }
+      $cfg = [ordered]@{ settings = [ordered]@{ fallback = @{} }; agents = @($ids | ForEach-Object { [ordered]@{ id = $_; engine = 'codex' } }) }
+      [IO.File]::WriteAllText($LocalCfg, ($cfg | ConvertTo-Json -Depth 5), (New-Object Text.UTF8Encoding $false))
+      Ok 'GPT 전용으로 설정했어요 (모든 직원이 ChatGPT로 일해요)'
+    }
+
     Step '3/5' 'Node.js 준비 (사무실을 돌리는 엔진)'
     $nodeOk = $false
     if (Has 'node') { try { $nodeOk = [int](& node -p "process.versions.node.split('.')[0]") -ge 18 } catch {} }
@@ -80,7 +90,7 @@ function Invoke-AIOfficeInstall {
     Step '4/5' 'AI 프로그램 준비 (Claude Code, Codex)'
     # 윈도우용 Claude Code는 Git Bash를 씁니다. Git이 없으면 관리자 권한 없이 쓰는 휴대용 Git을 받아 둡니다.
     $gitBash = Join-Path $Runtime 'git\bin\bash.exe'
-    if (-not (Has 'git') -and -not (Test-Path $gitBash)) {
+    if (-not $GptOnly -and -not (Has 'git') -and -not (Test-Path $gitBash)) {
       Write-Host '   Git 준비 중... (윈도우용 Claude Code에 필요, 1~2분)'
       $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
       try { & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Dest 'win-git.ps1') -Dest $Dest } catch {}
@@ -88,7 +98,7 @@ function Invoke-AIOfficeInstall {
       if (Test-Path $gitBash) { Ok 'Git 준비 완료' } else { Write-Host "   [!] Git 준비가 끝나지 않았어요. 사무실의 '시작 준비'에서 다시 시도할 수 있어요." -ForegroundColor Yellow }
     }
     if (Test-Path $gitBash) { $env:CLAUDE_CODE_GIT_BASH_PATH = $gitBash; Add-Path (Join-Path $Runtime 'git\cmd') }
-    if (Has 'claude') { Ok 'Claude Code 이미 있어요' } else {
+    if ($GptOnly) { Ok 'Claude Code는 건너뛰어요 (GPT 전용 설치)' } elseif (Has 'claude') { Ok 'Claude Code 이미 있어요' } else {
       Write-Host '   Claude Code 설치 중...'
       try { & powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://claude.ai/install.ps1 | iex" } catch {}
       Add-Path (Join-Path $env:USERPROFILE '.local\bin')

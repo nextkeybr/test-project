@@ -8,9 +8,10 @@ const { spawn, execFile } = require('child_process');
 
 const ROOT = __dirname;
 // agents.json = 기본 설정 (업데이트로 바뀜). agents.local.json = 내 설정 (업데이트해도 안 바뀜)
-const CFG = JSON.parse(fs.readFileSync(path.join(ROOT, 'agents.json'), 'utf8'));
+const readJson = (f) => JSON.parse(fs.readFileSync(f, 'utf8').replace(/^\uFEFF/, '')); // 메모장 등이 붙이는 BOM 제거
+const CFG = readJson(path.join(ROOT, 'agents.json'));
 try {
-  const local = JSON.parse(fs.readFileSync(path.join(ROOT, 'agents.local.json'), 'utf8'));
+  const local = readJson(path.join(ROOT, 'agents.local.json'));
   Object.assign(CFG.settings, local.settings || {});
   for (const [k, v] of Object.entries(local.engines || {})) CFG.engines[k] = { ...(CFG.engines[k] || {}), ...v };
   for (const la of local.agents || []) {
@@ -83,7 +84,7 @@ for (const a of CFG.agents) if (!a.removed) setupAgent(a);
 // ---------- 내 설정 파일 (agents.local.json) 읽기/쓰기 ----------
 const LOCAL_PATH = path.join(ROOT, 'agents.local.json');
 function readLocal() {
-  try { return JSON.parse(fs.readFileSync(LOCAL_PATH, 'utf8')); } catch (e) {
+  try { return readJson(LOCAL_PATH); } catch (e) {
     if (e.code === 'ENOENT') return {};
     throw new Error('agents.local.json 파일 형식이 잘못돼 저장하지 못했어요');
   }

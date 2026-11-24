@@ -20,7 +20,12 @@ AI 직원 6명이 귀여운 사무실에서 실제로 일하는 개인용 대시
 
 Node.js, Claude Code, Codex가 없으면 **알아서 설치**합니다. 관리자 비밀번호는 필요 없어요.
 
-### 윈도우
+### 윈도우 — 설치 파일 더블클릭 (가장 쉬움)
+- `installers/install-windows-gpt.bat` : **GPT 전용** (ChatGPT 계정만, 무료 계정도 가능). Claude 설치를 건너뛰고 모든 직원을 GPT로 설정
+- `installers/install-windows.bat` : **전체** (Claude + GPT)
+- 더블클릭했을 때 "Windows의 PC 보호" 창이 뜨면 **추가 정보 → 실행**
+
+### 윈도우 — 명령어로 설치
 그림 안내: [docs/install-guide-windows.png](docs/install-guide-windows.png)
 
 1. 키보드에서 **윈도우키 + R** 을 누릅니다 (실행 창이 뜹니다).
