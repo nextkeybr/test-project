@@ -410,6 +410,12 @@ function startTask(a, task) {
     if (!e) return finishTask(a, task, outBefore, false, `엔진 설정을 찾을 수 없습니다: ${engineKey}`);
     cmd = e.cmd;
     args = e.args.map((x) => x.replace('{PROMPT}', prompt).replace('{RESULT_FILE}', resultFile));
+    // 윈도우: Codex 보호 모드(sandbox) 방식을 지정. 기본 'unelevated' = 관리자 설정 없이 쓰는 방식 (보호는 유지).
+    // 관리자 설정(codex sandbox setup)을 마쳤다면 settings.codexWindowsSandbox 를 'elevated' 로 바꿀 수 있음. '' 이면 지정 안 함.
+    if (IS_WIN && engineKey === 'codex') {
+      const mode = SET.codexWindowsSandbox ?? 'unelevated';
+      if (mode) args = ['-c', `windows.sandbox=${mode}`, ...args];
+    }
     // 직원별로 추가 허용할 도구 (예: 디자이너의 이미지 생성 MCP)
     const ai = args.indexOf('--allowedTools');
     if (ai >= 0 && (a.cfg.allowTools || []).length) args[ai + 1] += ',' + a.cfg.allowTools.join(',');
